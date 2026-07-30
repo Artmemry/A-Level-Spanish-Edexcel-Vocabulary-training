@@ -231,3 +231,21 @@ footer.site{max-width:1060px; margin:0 auto; padding:20px; border-top:1px solid 
 .accent-pad button:hover{border-color:var(--bleu); background:var(--bleu-pale)}
 .accent-pad button:active{background:var(--bleu); color:#fff}
 body.pad-on main{padding-bottom:150px}
+
+/* ── speak buttons ── */
+button.speak{
+  border:1px solid var(--line-strong); background:var(--card); border-radius:8px;
+  font-size:1rem; padding:4px 8px; cursor:pointer; vertical-align:middle;
+}
+button.speak.small{font-size:.8rem; padding:2px 6px}
+button.speak:hover{border-color:var(--bleu); background:var(--bleu-pale)}
+
+/* ── print (Liste view as handout) ── */
+@media print{
+  header.site nav, footer.site, .no-print, .accent-pad, button.speak, .btn{display:none!important}
+  body{background:#fff}
+  main{padding:0; max-width:none}
+  table.stats th{border-bottom:2px solid #000; color:#000}
+  table.stats td{border-bottom:1px solid #999}
+  h2{font-size:1.2rem}
+}
