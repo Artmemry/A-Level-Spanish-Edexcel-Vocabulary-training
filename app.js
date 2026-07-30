@@ -102,38 +102,88 @@ function normFr(s){return s.toLowerCase().replace(/’/g,"'").replace(/\s*\([^)]
 function stripArt(s){return s.replace(/^(el |la |los |las |un |una |unos |unas |lo )/,"")}
 function normEn(s){return s.toLowerCase().replace(/’/g,"'").replace(/-/g," ").replace(/(\w)iz(e[sdr]?|ing|ation)\b/g,"$1is$2").replace(/\s*\([^)]*\)/g,"").replace(/\.{3}$/,"").replace(/[!?.]+$/,"").replace(/\s+/g," ").trim()}
 function stripEnLead(s){return s.replace(/^(the |a |an |to )/,"")}
-function lev1(a,b){ // true if levenshtein distance ≤1
-  if(a===b)return true;
-  if(Math.abs(a.length-b.length)>1)return false;
-  let i=0,j=0,edits=0;
-  while(i<a.length&&j<b.length){
-    if(a[i]===b[j]){i++;j++;continue}
-    if(++edits>1)return false;
-    if(a.length>b.length)i++; else if(b.length>a.length)j++; else{i++;j++}
+function levDist(a,b,max){
+  if(a===b)return 0;
+  if(Math.abs(a.length-b.length)>max)return max+1;
+  let prev=Array(b.length+1).fill(0).map((_,i)=>i);
+  for(let i=1;i<=a.length;i++){
+    const cur=[i]; let rowMin=i;
+    for(let j=1;j<=b.length;j++){
+      cur[j]=Math.min(prev[j]+1, cur[j-1]+1, prev[j-1]+(a[i-1]===b[j-1]?0:1));
+      if(cur[j]<rowMin)rowMin=cur[j];
+    }
+    if(rowMin>max)return max+1;
+    prev=cur;
   }
-  return edits+(a.length-i)+(b.length-j)<=1;
+  return prev[b.length];
+}
+function nearMiss(a,b){ // grammar-safe typo tolerance
+  // Edits only tolerated MID-WORD: the final two characters of every word must
+  // match exactly, because Spanish/French grammar (gender, number, verb endings)
+  // lives in the suffix. Same word count required.
+  const ta=a.split(" "), tb=b.split(" ");
+  if(ta.length!==tb.length) return false;
+  const phraseTol=Math.max(a.length,b.length)>=12?2:1;
+  let edits=0;
+  for(let k=0;k<ta.length;k++){
+    const wa=ta[k], wb=tb[k];
+    if(wa===wb) continue;
+    if(Math.max(wa.length,wb.length)<5) return false;          // short words: exact only
+    if(wa.slice(-2)!==wb.slice(-2)) return false;              // suffix zone protected
+    const d=levDist(wa.slice(0,-2), wb.slice(0,-2), 2);
+    if(d>2) return false;
+    edits+=d;
+    if(edits>phraseTol) return false;
+  }
+  return edits>0 && edits<=phraseTol;
 }
 
+
+/* real-word guard: every accent/article-stripped form in the lists */
+const ANSWER_FORMS=new Set();
+CORPUS.forEach(e=>e.es.forEach(v=>ANSWER_FORMS.add(stripAcc(stripArt(normFr(v))))));
+
 /* answer checking — returns {q, msg, cls[, alt]} */
-function frTiers(raw, variants){
+function frTiers(raw, variants, allowFuzzy){
   const vars=variants.map(normFr);
   if(vars.includes(raw)) return {q:5,msg:"Exacto.",cls:"good"};
   if(vars.map(stripAcc).includes(stripAcc(raw))) return {q:4,msg:"Bien — pero cuidado con las tildes.",cls:"good"};
-  if(vars.map(v=>stripArt(v)).includes(stripArt(raw))||vars.map(v=>stripAcc(stripArt(v))).includes(stripAcc(stripArt(raw))))
+  const rawHasArt = raw!==stripArt(raw);
+  if(vars.map(v=>stripArt(v)).includes(stripArt(raw))||vars.map(v=>stripAcc(stripArt(v))).includes(stripAcc(stripArt(raw)))){
+    const target=variants.map(normFr).find(v=>stripAcc(stripArt(v))===stripAcc(stripArt(raw)));
+    const varHasArt = target && target!==stripArt(target);
+    if(rawHasArt && varHasArt){
+      const ra=raw.match(/^(el |la |los |las |un |una |unos |unas |lo )/)[0], va=target.match(/^(el |la |los |las |un |una |unos |unas |lo )/)[0];
+      if(ra!==va) return {q:1,msg:"El art\u00edculo no es correcto \u2014 el g\u00e9nero cuenta como gram\u00e1tica.",cls:"bad"};
+    }
+    if(rawHasArt && !varHasArt) return {q:5,msg:"Exacto.",cls:"good"};
     return {q:3,msg:"La palabra es correcta — revisa el artículo.",cls:"good"};
-  if(vars.some(v=>lev1(stripAcc(stripArt(v)),stripAcc(stripArt(raw)))&&stripArt(v).length>=5))
+  }
+  if(allowFuzzy && vars.some(v=>nearMiss(stripAcc(stripArt(v)),stripAcc(stripArt(raw)))))
     return {q:3,msg:"Casi — revisa la ortografía.",cls:"good"};
   return null;
 }
 function checkFr(ans, entry, promptedGloss){
   const raw=normFr(ans); if(!raw)return null;
-  const own=frTiers(raw, entry.es);
+  const rawForm=stripAcc(stripArt(raw));
+  const own=frTiers(raw, entry.es, false);
   if(own) return own;
   // cross-acceptance: any entry in the lists sharing the prompted gloss
   const sibs=(GLOSS_TO_ENTRIES[xCanonEn(promptedGloss||entry.en[0])]||[]).filter(x=>x.id!==entry.id);
   for(const s of sibs){
-    const hit=frTiers(raw, s.es);
+    const hit=frTiers(raw, s.es, false);
     if(hit) return {...hit, alt:s};
+  }
+  // fuzzy pass only if the answer is not itself a different word from the lists
+  const inPool=[entry].concat(sibs).some(x=>x.es.some(v=>stripAcc(stripArt(normFr(v)))===rawForm));
+  const allowFuzzy=inPool || !ANSWER_FORMS.has(rawForm);
+  if(allowFuzzy){
+    const own2=frTiers(raw, entry.es, true);
+    if(own2) return own2;
+    for(const s of sibs){
+      const hit=frTiers(raw, s.es, true);
+      if(hit) return {...hit, alt:s};
+    }
   }
   return {q:1,msg:"No.",cls:"bad"};
 }
@@ -148,7 +198,7 @@ function checkEn(ans, entry){
   const vars=[...pool].map(normEn);
   if(vars.includes(raw)||vars.map(stripEnLead).includes(stripEnLead(raw)))
     return {q:5,msg:"Exacto.",cls:"good"};
-  if(vars.some(v=>lev1(stripEnLead(v),stripEnLead(raw))&&stripEnLead(v).length>=5))
+  if(vars.some(v=>nearMiss(stripEnLead(v),stripEnLead(raw))))
     return {q:4,msg:"Bien — pequeño error de ortografía.",cls:"good"};
   return {q:1,msg:"No.",cls:"bad"};
 }
@@ -292,7 +342,7 @@ function startLesson(uid,lid){
         el("button",{class:"btn primary",onclick:()=>{
           const ids=shuffle(L.ids);
           sess={queue:ids.map((id,i)=>({id,dir:lessonPrefs.dir==="mixte"?(i%2?"fren":"enfr"):lessonPrefs.dir})),
-                i:0,ok:0,wrong:[],back:renderAccueil,label:`${uid} · Leçon ${lid.split(".")[1]}`,view:"#view-accueil"};
+                i:0,ok:0,wrong:[],back:renderAccueil,label:`${uid} · Lección ${lid.split(".")[1]}`,view:"#view-accueil"};
           renderQ();
         }},"Empezar — toda la lección"))));
 }
@@ -332,7 +382,7 @@ function renderQ(){
   const enfr=dir==="enfr";
   const promptTxt=enfr? e.en[0] : e.es[0];
   const card=el("div",{class:"entry"},
-    el("div",{class:"entry-meta"},`${sess.label} · ${enfr?"inglés → español (con el artículo)":"español → inglés"}`),
+    el("div",{class:"entry-meta"},`${sess.label} · ${enfr?(e.es.some(v=>/^(el |la |los |las |un |una |unos |unas |lo )/i.test(v))?"inglés → español (con el artículo)":"inglés → español"):"español → inglés"}`),
     el("div",{class:"headword",style:enfr?"font-family:var(--font-body);font-weight:600;font-size:1.5rem":""},promptTxt),
     (enfr?e.en:e.es).length>1? el("div",{class:"gramm"},"también: "+(enfr?e.en:e.es).slice(1).join(" ; ")):null);
   const inp=el("input",{class:"typed",type:"text",autocapitalize:"off",autocomplete:"off",spellcheck:"false",
@@ -349,8 +399,14 @@ function renderQ(){
     if(res.q>=3)sess.ok++; else sess.wrong.push(e.id);
     inp.disabled=true; check.disabled=true;
     hidePad();
+    let sibs="";
+    if(enfr && res.q<3){
+      const others=(GLOSS_TO_ENTRIES[xCanonEn(e.en[0])]||[]).filter(x=>x.id!==e.id).map(x=>x.es[0]);
+      if(others.length) sibs=[...new Set(others)].slice(0,3).join(" · ");
+    }
     card.append(
       el("div",{class:"feedback "+res.cls},res.msg,
+        sibs? el("span",{class:"note"},"También en tus listas con este sentido: ",sibs):null,
         res.alt? el("span",{class:"note"},"Tu respuesta « ",res.alt.es[0]," » también figura en tus listas con este sentido — las dos valen."):null,
         el("span",{class:"note"},
           el("b",null,e.es.join(" ; "))," — ",e.en.join(" ; "))),
