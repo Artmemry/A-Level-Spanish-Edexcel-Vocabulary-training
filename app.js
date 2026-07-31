@@ -23,6 +23,8 @@ const CFG={
 /*T-START*/
 const T={
   padLabel:"Tildes y signos españoles",
+  audioLabel:"Audio", audioTitle:"Pronunciar automáticamente la palabra en español",
+  audioTest:"audio activado",
   homeTitle:"Tus listas de vocabulario",
   homeLede:"Las listas reproducen exactamente el cuaderno: elige una unidad y luego una lección. Consulta la lista o practica escribiendo tus respuestas — en los dos sentidos. Tu progreso se guarda en este dispositivo; exporta tu código en Progreso para enviárselo al profesor.",
   nameLabel:"Tu nombre (para el código exportado)",
@@ -104,7 +106,7 @@ function load(){
   let s=null;
   try{ const r=localStorage.getItem(CFG.ls); if(r) s=JSON.parse(r); }catch(e){}
   if(!s) s={name:"",srs:{},sessions:[],exams:[],created:Date.now(),v:3};
-  s.srs=s.srs||{}; s.sessions=s.sessions||[]; s.exams=s.exams||[];
+  s.srs=s.srs||{}; s.sessions=s.sessions||[]; s.exams=s.exams||[]; if(s.audio===undefined)s.audio=true;
   if(!s.v||s.v<3){ // split legacy per-entry records into production/recognition
     const old=s.srs; s.srs={};
     Object.keys(old).forEach(id=>{
@@ -235,6 +237,46 @@ CORPUS.forEach(e=>{
   e.en.forEach(g=>{const c=xCanonEn(g);(GLOSS_TO_ENTRIES[c]=GLOSS_TO_ENTRIES[c]||[]).push(e)});
   e[K].forEach(f=>{const lk=xLexkey(f);const set=(LEX_TO_GLOSSES[lk]=LEX_TO_GLOSSES[lk]||new Set());e.en.forEach(g=>set.add(g))});
 });
+/* ───────── synonym layer (data/synonyms.js, optional) ───────── */
+const _SY=(typeof window!=="undefined"&&window.SYNONYMS)?window.SYNONYMS:{tg:[],en:[]};
+function synNorm(s){ return stripAcc(stripArt(normFr(s))); }
+const SYN_TG_IDX={}, SYN_EN_IDX={};
+(_SY.tg||[]).forEach(g=>{
+  const words=Array.isArray(g)?g:(g.w||[]);
+  const gate=Array.isArray(g)?null:(g.for||[]).map(xCanonEn);
+  const rec={words,gate};
+  words.forEach(w=>{const k=synNorm(w);(SYN_TG_IDX[k]=SYN_TG_IDX[k]||[]).push(rec)});
+});
+(_SY.en||[]).forEach(g=>{
+  const words=Array.isArray(g)?g:(g.w||[]);
+  const rec={words};
+  words.forEach(w=>{const k=xCanonEn(w);(SYN_EN_IDX[k]=SYN_EN_IDX[k]||[]).push(rec)});
+});
+function gateOk(gate, entry){
+  if(!gate||!gate.length) return true;
+  const gl=entry.en.map(xCanonEn);
+  return gate.some(g=>gl.some(x=>x===g||new RegExp("(^|\\s)"+g.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"($|\\s)").test(x)));
+}
+function synVariants(entry){
+  const own=new Set(entry[K].map(synNorm)), out=[];
+  entry[K].forEach(v=>{
+    (SYN_TG_IDX[synNorm(v)]||[]).forEach(rec=>{
+      if(!gateOk(rec.gate,entry))return;
+      rec.words.forEach(w=>{ if(!own.has(synNorm(w)) && out.indexOf(w)<0) out.push(w); });
+    });
+  });
+  return out;
+}
+function synGlosses(entry){
+  const own=new Set(entry.en.map(xCanonEn)), out=[];
+  entry.en.forEach(g=>{
+    (SYN_EN_IDX[xCanonEn(g)]||[]).forEach(rec=>{
+      rec.words.forEach(w=>{ if(!own.has(xCanonEn(w)) && out.indexOf(w)<0) out.push(w); });
+    });
+  });
+  return out;
+}
+
 const ANSWER_FORMS=new Set();
 CORPUS.forEach(e=>e[K].forEach(v=>ANSWER_FORMS.add(stripAcc(stripArt(normFr(v))))));
 
@@ -268,7 +310,14 @@ function checkFr(ans, entry, promptedGloss){
     const hit=frTiers(raw, s[K], false);
     if(hit) return {...hit, alt:s};
   }
-  const inPool=[entry].concat(sibs).some(x=>x[K].some(v=>stripAcc(stripArt(normFr(v)))===rawForm));
+  // curated synonym layer: any interchangeable form for this entry's sense
+  const syn=synVariants(entry);
+  for(const w of syn){
+    const hit=frTiers(raw, [w], false);
+    if(hit) return {...hit, altTxt:w};
+  }
+  const inPool=[entry].concat(sibs).some(x=>x[K].some(v=>stripAcc(stripArt(normFr(v)))===rawForm))
+    || syn.some(w=>stripAcc(stripArt(normFr(w)))===rawForm);
   const allowFuzzy=inPool || !ANSWER_FORMS.has(rawForm);
   if(allowFuzzy){
     const own2=frTiers(raw, entry[K], true);
@@ -277,6 +326,10 @@ function checkFr(ans, entry, promptedGloss){
       const hit=frTiers(raw, s[K], true);
       if(hit) return {...hit, alt:s};
     }
+    for(const w of syn){
+      const hit=frTiers(raw, [w], true);
+      if(hit) return {...hit, altTxt:w};
+    }
   }
   return {q:1,msg:T.wrong,cls:"bad"};
 }
@@ -284,6 +337,7 @@ function checkEn(ans, entry){
   const raw=normEn(ans); if(!raw)return null;
   const pool=new Set(entry.en);
   entry[K].forEach(f=>{const s=LEX_TO_GLOSSES[xLexkey(f)]; if(s)s.forEach(g=>pool.add(g))});
+  synGlosses(entry).forEach(g=>pool.add(g));
   const vars=[...pool].map(normEn);
   if(vars.includes(raw)||vars.map(stripEnLead).includes(stripEnLead(raw)))
     return {q:5,msg:T.exact,cls:"good"};
@@ -294,11 +348,42 @@ function checkEn(ans, entry){
 
 /* ───────── TTS ───────── */
 const ttsOK="speechSynthesis" in window;
+let _voice=null;
+function pickVoice(){
+  if(!ttsOK)return null;
+  const vs=speechSynthesis.getVoices()||[];
+  if(!vs.length)return null;
+  const base=CFG.ttsLang.split("-")[0].toLowerCase();
+  return vs.find(v=>v.lang&&v.lang.replace("_","-")===CFG.ttsLang)
+      || vs.find(v=>v.lang&&v.lang.toLowerCase().replace("_","-").startsWith(base))
+      || null;
+}
+if(ttsOK&&speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged",()=>{_voice=pickVoice()});
+/* iOS/Safari require a user gesture before any speech is allowed */
+let _unlocked=false;
+function unlockTts(){
+  if(_unlocked||!ttsOK)return;
+  _unlocked=true;
+  try{const u=new SpeechSynthesisUtterance(" ");u.volume=0;speechSynthesis.speak(u)}catch(e){}
+}
+document.addEventListener("pointerdown",unlockTts,{once:true});
+document.addEventListener("keydown",unlockTts,{once:true});
 function speak(txt){
   if(!ttsOK)return;
-  const u=new SpeechSynthesisUtterance(String(txt).replace(/\s*\([^)]*\)/g,"").replace(/;.*/,""));
+  unlockTts();
+  const u=new SpeechSynthesisUtterance(String(txt).replace(/\s*\([^)]*\)/g,"").replace(/;.*/,"").trim());
+  _voice=_voice||pickVoice();
+  if(_voice)u.voice=_voice;
   u.lang=CFG.ttsLang; u.rate=0.88;
   speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+function autoSpeak(txt){ if(S.audio!==false) speak(txt); }
+function audioToggle(){
+  if(!ttsOK)return null;
+  const b=el("button",{class:"btn small ghost",type:"button",title:T.audioTitle});
+  const paint=()=>{ b.textContent=(S.audio===false?"🔇 ":"🔊 ")+T.audioLabel; };
+  b.addEventListener("click",()=>{ S.audio=!(S.audio!==false); save(); paint(); if(S.audio!==false)speak(T.audioTest); });
+  paint(); return b;
 }
 function speakBtn(txt,small){
   if(!ttsOK)return null;
@@ -377,7 +462,8 @@ function renderAccueil(){
     el("div",{class:"card"},
       el("label",{for:"student-name",style:"font-weight:600;font-size:.9rem"},T.nameLabel),
       el("input",{id:"student-name",class:"typed",style:"margin-top:8px",value:S.name||"",placeholder:T.namePh,
-        oninput:e=>{S.name=e.target.value.trim();save()}})));
+        oninput:e=>{S.name=e.target.value.trim();save()}}),
+      el("div",{class:"btn-row"},audioToggle())));
   if(a){
     const card=el("div",{class:"card",style:"margin-top:14px;border-color:var(--bleu)"},
       el("h3",null,T.taskTitle+" — "+a.label));
@@ -538,7 +624,8 @@ function renderQ(){
     el("button",{class:"btn small ghost",onclick:sess.back},T.quit),
     el("div",{class:"progress"},el("i",{style:"width:"+p+"%"})),
     el("span",{class:"session-count"},`${sess.i+1} / ${sess.queue.length}`),
-    sess.silent?null:el("span",{class:"score-pill"},`✓ ${sess.ok}`)));
+    sess.silent?null:el("span",{class:"score-pill"},`✓ ${sess.ok}`),
+    audioToggle()));
   const {id,dir}=sess.queue[sess.i], e=byId[id];
   const enfr=dir==="enfr", dict=dir==="dict";
   const hasArt=e[K].some(vv=>CFG.artRe.test(vv.toLowerCase()));
@@ -553,7 +640,7 @@ function renderQ(){
   } else {
     promptNode=el("div",{class:"headword"},e[K][0]," ",speakBtn(e[K][0]));
   }
-  const others=(dict?[]:(enfr?e.en:e[K]).slice(1));
+  const others=(dict||enfr)?[]:e[K].slice(1);   // production shows ONE gloss to translate; full set revealed in feedback
   const card=el("div",{class:"entry"},
     el("div",{class:"entry-meta"},`${sess.label} · ${meta}`),
     promptNode,
@@ -586,10 +673,12 @@ function renderQ(){
     card.append(
       el("div",{class:"feedback "+res.cls},res.msg,
         sibs? el("span",{class:"note"},T.sibNote,sibs):null,
-        res.alt? el("span",{class:"note"},...T.altNote(res.alt[K][0])):null,
+        res.alt? el("span",{class:"note"},...T.altNote(res.alt[K][0])):
+        res.altTxt? el("span",{class:"note"},...T.altNote(res.altTxt)):null,
         el("span",{class:"note"},
           el("b",null,e[K].join(" ; "))," ",speakBtn(e[K][0],true)," — ",e.en.join(" ; "))),
       nextBtn());
+    autoSpeak(e[K][0]);                                        // correct form revealed → say it
   }
   check.addEventListener("click",doCheck);
   inp.addEventListener("keydown",ev=>{if(ev.key==="Enter")doCheck()});
@@ -597,6 +686,7 @@ function renderQ(){
   card.append(inp,row);
   v.append(card);
   if(targetLang) showPad(inp);
+  if(!dict && !enfr) setTimeout(()=>autoSpeak(e[K][0]),220);   // target word on screen → say it
   setTimeout(()=>inp.focus(),50);
 }
 function nextBtn(){
