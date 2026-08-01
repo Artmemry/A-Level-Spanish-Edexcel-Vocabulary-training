@@ -26,6 +26,7 @@ const T={
   padLabel:"Tildes y signos españoles",
   audioLabel:"Audio", audioTitle:"Pronunciar automáticamente la palabra en español",
   audioTest:"audio activado",
+  voiceLabel:"Voz", voiceHint:"★ = la mejor voz que ofrece este dispositivo. Prueba las demás si no te convence.",
   homeTitle:"Tus listas de vocabulario",
   homeLede:"Las listas reproducen exactamente el cuaderno: elige una unidad y luego una lección. Consulta la lista o practica escribiendo tus respuestas — en los dos sentidos. Tu progreso se guarda en este dispositivo; exporta tu código en Progreso para enviárselo al profesor.",
   nameLabel:"Tu nombre (para el código exportado)",
@@ -467,14 +468,36 @@ function checkEn(ans, entry){
 /* ───────── TTS ───────── */
 const ttsOK="speechSynthesis" in window;
 let _voice=null;
-function pickVoice(){
-  if(!ttsOK)return null;
-  const vs=speechSynthesis.getVoices()||[];
-  if(!vs.length)return null;
+/* Voice quality varies enormously between the voices installed on a device.
+   Rank them instead of taking whichever the browser lists first. */
+function voiceScore(v){
+  const n=(v.name||""), ln=n.toLowerCase(), lang=(v.lang||"").replace("_","-");
+  let s=0;
+  if(lang===CFG.ttsLang) s+=40; else if(lang.toLowerCase().startsWith(CFG.ttsLang.split("-")[0])) s+=15;
+  // modern neural engines
+  if(/natural|neural|premium|enhanced|siri|wavenet|studio/.test(ln)) s+=45;
+  if(/google/.test(ln)) s+=30;             // Chrome's server voices — clearly better than local ones
+  if(v.localService===false) s+=20;        // network voices are generally the good ones
+  if(/online/.test(ln)) s+=10;
+  // known-decent named system voices
+  if(/thomas|am(é|e)lie|audrey|marie|denise|henri|c(é|e)line|mónica|monica|paulina|jorge|helena|elvira|sabina|lucia|alvaro/.test(ln)) s+=12;
+  // known-poor engines
+  if(/espeak|compact|festival|pico|robot/.test(ln)) s-=60;
+  if(/eloquence/.test(ln)) s-=30;
+  return s;
+}
+function voiceList(){
+  if(!ttsOK)return [];
   const base=CFG.ttsLang.split("-")[0].toLowerCase();
-  return vs.find(v=>v.lang&&v.lang.replace("_","-")===CFG.ttsLang)
-      || vs.find(v=>v.lang&&v.lang.toLowerCase().replace("_","-").startsWith(base))
-      || null;
+  return (speechSynthesis.getVoices()||[])
+    .filter(v=>v.lang&&v.lang.toLowerCase().replace("_","-").startsWith(base))
+    .sort((a,b)=>voiceScore(b)-voiceScore(a));
+}
+function pickVoice(){
+  const vs=voiceList();
+  if(!vs.length)return null;
+  if(S.voice){ const saved=vs.find(v=>v.name===S.voice); if(saved)return saved; }
+  return vs[0];
 }
 if(ttsOK&&speechSynthesis.addEventListener) speechSynthesis.addEventListener("voiceschanged",()=>{_voice=pickVoice()});
 /* iOS/Safari require a user gesture before any speech is allowed */
@@ -492,7 +515,7 @@ function speak(txt){
   const u=new SpeechSynthesisUtterance(String(txt).replace(/\s*\([^)]*\)/g,"").replace(/;.*/,"").trim());
   _voice=_voice||pickVoice();
   if(_voice)u.voice=_voice;
-  u.lang=CFG.ttsLang; u.rate=0.88;
+  u.lang=CFG.ttsLang; u.rate=(S.rate||0.88); u.pitch=1;
   speechSynthesis.cancel(); speechSynthesis.speak(u);
 }
 function autoSpeak(txt){ if(S.audio!==false) speak(txt); }
@@ -502,6 +525,22 @@ function audioToggle(){
   const paint=()=>{ b.textContent=(S.audio===false?"🔇 ":"🔊 ")+T.audioLabel; };
   b.addEventListener("click",()=>{ S.audio=!(S.audio!==false); save(); paint(); if(S.audio!==false)speak(T.audioTest); });
   paint(); return b;
+}
+function voicePicker(){
+  if(!ttsOK)return null;
+  const vs=voiceList();
+  if(vs.length<2)return null;                       // nothing to choose between
+  const wrap=el("div",{style:"margin-top:10px"});
+  const sel=el("select",{class:"typed",style:"margin-top:6px;font-size:.95rem",
+    onchange:e=>{ S.voice=e.target.value; save(); _voice=pickVoice(); speak(T.audioTest); }});
+  vs.forEach((v,i)=>{
+    const o=el("option",{value:v.name}, v.name+(i===0?" ★":""));
+    if((S.voice||vs[0].name)===v.name) o.setAttribute("selected","");
+    sel.append(o);
+  });
+  wrap.append(el("label",{style:"font-weight:600;font-size:.9rem"},T.voiceLabel), sel,
+    el("div",{style:"font-size:.8rem;color:var(--muted);margin-top:4px"},T.voiceHint));
+  return wrap;
 }
 function speakBtn(txt,small){
   if(!ttsOK)return null;
@@ -581,7 +620,7 @@ function renderAccueil(){
       el("label",{for:"student-name",style:"font-weight:600;font-size:.9rem"},T.nameLabel),
       el("input",{id:"student-name",class:"typed",style:"margin-top:8px",value:S.name||"",placeholder:T.namePh,
         oninput:e=>{S.name=e.target.value.trim();save()}}),
-      el("div",{class:"btn-row"},audioToggle())));
+      el("div",{class:"btn-row"},audioToggle()), voicePicker()));
   if(a){
     const card=el("div",{class:"card",style:"margin-top:14px;border-color:var(--bleu)"},
       el("h3",null,T.taskTitle+" — "+a.label));
