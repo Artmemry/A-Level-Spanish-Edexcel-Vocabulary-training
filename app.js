@@ -15,9 +15,9 @@ const CFG={
   artRe:/^(el |la |los |las |un |una |unos |unas |lo )/,
   accents:["á","é","í","ó","ú","ñ","ü","¡","¿"],
   stop:"el la los las un una unos unas de del al a en y e o u que se lo le les me te nos os su sus mi mis tu tus es son ser estar esta estan como por para con sin mas muy ya he ha han hay tan todo toda todos todas sobre hasta desde entre cuando donde aqui alli este esta esto ese esa eso",
-  FORMS_URL:"",                   // paste the MS Forms base URL here
-  FORMS_FIELD_NAME:"",            // r… token for the name question
-  FORMS_FIELD_CODE:""             // r… token for the code question
+  FORMS_URL:"https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=dBTLADSljUaCn2NuzjLCTEWSzXdNOvRDicS2YScslGFUMzhIUlZJRThXRUQ3RTVQMlFUUFk2UTJWNyQlQCNjPTEu",
+  FORMS_FIELD_NAME:"",   // empty = code is copied and pasted by hand
+  FORMS_FIELD_CODE:""
 };
 /*CFG-END*/
 
@@ -95,6 +95,8 @@ const T={
   sendFormsTxt:"Haz clic en « Enviar por MS Forms »: el formulario se abre con tu nombre y tu código ya rellenados — solo te queda pulsar Enviar. El código solo contiene tus estadísticas y el nombre escrito en Inicio.",
   sendCopyTxt:"Copia este código y envíaselo a tu profesor (correo, Teams…). Solo contiene tus estadísticas y el nombre escrito en Inicio.",
   sendForms:"Enviar por MS Forms", copyCode:"Copiar el código",
+  sendPasteTxt:"Haz clic en « Enviar por MS Forms »: tu código se copia solo y el formulario se abre. Pega el código en la casilla « Code », escribe tu nombre y pulsa Enviar.",
+  formsPasteHint:"Código copiado. Pégalo en la casilla « Code » del formulario.",
   backup:"Copia de seguridad (.json)", restore:"Restaurar copia", reset:"Reiniciar",
   resetConfirm:"¿Borrar todo el progreso en este dispositivo? Esta acción es definitiva.",
   restored:"Copia restaurada.", badFile:"Archivo no reconocido — elige una copia exportada desde este sitio.",
@@ -976,12 +978,20 @@ function renderSuivi(){
   const ta=el("textarea",{class:"code",readonly:""},code);
   v.append(el("div",{class:"section-label"},T.sendTitle),
     el("div",{class:"card"},
-      el("p",{style:"margin:0 0 10px"},CFG.FORMS_URL?T.sendFormsTxt:T.sendCopyTxt),
+      el("p",{style:"margin:0 0 10px"},CFG.FORMS_URL?((CFG.FORMS_FIELD_NAME&&CFG.FORMS_FIELD_CODE)?T.sendFormsTxt:T.sendPasteTxt):T.sendCopyTxt),
       ta,
       el("div",{class:"btn-row"},
-        CFG.FORMS_URL? el("button",{class:"btn primary",onclick:()=>{window.open(
-          CFG.FORMS_URL+"&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName)
-                       +"&"+CFG.FORMS_FIELD_CODE+"="+encodeURIComponent(code),"_blank")}},T.sendForms):null,
+        CFG.FORMS_URL? el("button",{class:"btn primary",onclick:async()=>{
+          const prefill = CFG.FORMS_FIELD_NAME && CFG.FORMS_FIELD_CODE;
+          if(!prefill){                       // tokens unknown: copy first so one paste finishes it
+            try{ await navigator.clipboard.writeText(code); }catch(e){ ta.select(); document.execCommand("copy"); }
+            alert(T.formsPasteHint);
+            window.open(CFG.FORMS_URL,"_blank","noopener");
+            return;
+          }
+          window.open(CFG.FORMS_URL+"&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName)
+                       +"&"+CFG.FORMS_FIELD_CODE+"="+encodeURIComponent(code),"_blank","noopener");
+        }},T.sendForms):null,
         el("button",{class:"btn"+(CFG.FORMS_URL?" ghost":" primary"),onclick:async()=>{try{await navigator.clipboard.writeText(code)}catch(e){ta.select();document.execCommand("copy")}}},T.copyCode),
         el("button",{class:"btn ghost",onclick:downloadBackup},T.backup),
         el("button",{class:"btn ghost",onclick:restoreBackup},T.restore),
