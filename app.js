@@ -401,12 +401,13 @@ CORPUS.forEach(e=>e[K].forEach(v=>ANSWER_FORMS.add(stripAcc(stripArt(normFr(v)))
        share an English meaning;
      · anything the rules get wrong can be pinned in the data file. */
 const _G = (typeof window!=="undefined" && window.GENERO) ? window.GENERO : null;
-const G_PAIR = {}, G_BLOCK = {};
+const G_PAIR = {}, G_BLOCK = {}, G_PERSON = {};
 if(_G){
   (_G.pairs||[]).forEach(p=>{ const m=p[0], f=p[1];
     (G_PAIR[m]=G_PAIR[m]||[]).push(f); (G_PAIR[f]=G_PAIR[f]||[]).push(m); });
   (_G.excepciones||_G.exceptions||[]).forEach(p=>{
     if(typeof p === "string") G_BLOCK[p]=1; else p.forEach(w=>{ G_BLOCK[w]=1; }); });
+  (_G.personas||_G.personnes||[]).forEach(w=>{ G_PERSON[w]=1; });
 }
 /* every answer form in the corpus, with the meanings it carries, so a
    derived form can be checked against words that already exist */
@@ -432,11 +433,16 @@ function gOther(w){                       // the other gender of one word
   });
   return out;
 }
+function gPlural(x){                       /* re-pluralise after flipping */
+  return /[aeiouáéíóú]$/.test(x) ? x+"s" : x+"es";
+}
 function gWordForms(w){                   /* singular or plural */
   const pl = /(es|s)$/.exec(w);
   if(pl && w.length > pl[0].length + 2){
+    /* los trabajadores → las trabajadoras, not «trabajadoraes»: the plural
+       ending is rebuilt from the flipped stem, not carried over. */
     const base = w.slice(0, w.length-pl[0].length), out = new Set();
-    gOther(base).forEach(x=>{ if(x!==base) out.add(x + pl[0]); });
+    gOther(base).forEach(x=>{ if(x!==base) out.add(gPlural(x)); });
     gOther(w).forEach(x=>out.add(x));
     return out;
   }
@@ -450,12 +456,31 @@ function genderForms(v){
   const arts = [];
   (_G.arts||[]).forEach(p=>{
     const a=p[0], b=p[1];
-    if(art.trim()===a && b!==a) arts.push(b+" ");
-    else if(art.trim()===b && b!==a) arts.push(a+" ");
+    /* les/des are the same in both genders: the article is kept, the word
+       still changes, so the pair is pushed even when a === b */
+    if(art.trim()===a) arts.push(b+" ");
+    else if(art.trim()===b) arts.push(a+" ");
   });
   if(!art) arts.push("");
   if(!arts.length) return [];
   const words = bare.split(" "), stops = _G.stops||[];
+  /* An article means the head is a noun, and most nouns have no other
+     gender: "el trabajo" must not become "la trabaja". A noun only flips
+     if it is a listed person noun. A bare word is an adjective or a
+     participle in this corpus, and those flip freely. */
+  if(art){
+    const h = words[0], sing = h.replace(/(es|s)$/, "");
+    let ok = G_PERSON[h] || G_PERSON[sing] || G_PAIR[h] || G_PAIR[sing];
+    if(!ok){
+      /* the list holds one member of the pair; "la profesora" is reached
+         through "profesor", so the flips are checked against it too */
+      const alts = new Set();
+      gOther(h).forEach(x=>alts.add(x));
+      gOther(sing).forEach(x=>alts.add(x));
+      alts.forEach(x=>{ if(G_PERSON[x] || G_PAIR[x]) ok = 1; });
+    }
+    if(!ok) return [];
+  }
   const heads = gWordForms(words[0]);
   if(!heads.size) return [];
   const out = [];
