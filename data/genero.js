@@ -75,5 +75,55 @@ window.GENERO = {
     ["clima","climo"],["agua","aguo"],["área","áreo"],["aula","aulo"]
   ],
 
+  /* Sustantivos de persona. Un sustantivo con artículo sólo cambia de género
+     si aparece aquí (o en "pairs"): "el empleado" sí, "el trabajo" no. Sin
+     esta lista, «la trabaja dura» se daría por buena. Los adjetivos sueltos
+     — sin artículo — no la necesitan: se transforman siempre.
+     Cuando añadas una profesión nueva al corpus, añade la palabra aquí. */
+  personas: [
+    "abogado", "abuelo", "activista", "aficionado", "africano",
+    "agricultor", "ahijado", "alcalde", "alemán", "allegado", "alumno",
+    "alzado", "americano", "amigo", "amo", "analista", "andaluz",
+    "aragonés", "argelino", "argentino", "arquitecto", "artista",
+    "asalariado", "asistente", "asiático", "asturiano", "ateo", "autónomo",
+    "ayudante", "barcelonés", "bisabuelo", "boliviano", "bombero",
+    "brasileño", "cajero", "camarero", "camionero", "campesino",
+    "canadiense", "canario", "candidato", "cantante", "carnicero",
+    "casado", "castellano", "catalán", "caudillo", "chaval", "chico",
+    "chileno", "chino", "ciudadano", "cliente", "cocinero", "colega",
+    "colombiano", "compañero", "comunista", "conductor", "consejero",
+    "coreano", "criado", "cubano", "cuñado", "cántabro", "danés",
+    "dentista", "deportista", "desempleado", "difunto", "diputado",
+    "director", "dirigeante", "divorciado", "dramaturgo", "drogadicto",
+    "dueño", "ecuatoriano", "egipcio", "emigrante", "empleado",
+    "empresario", "enfermero", "entrenador", "esclavo", "escocés",
+    "escritor", "español", "especialista", "espectador", "esposo",
+    "estadounidense", "estudiante", "europeo", "extranjero", "extremeño",
+    "famoso", "feminista", "finlandés", "francés", "funcionario",
+    "gallego", "galés", "ganadero", "gato", "gaucho", "gitano", "griego",
+    "guerrero", "guitarrista", "hermano", "hijastro", "hijo", "hispano",
+    "holandés", "huérfano", "indio", "indocumentado", "infiltrado",
+    "ingeniero", "inglés", "inmigrante", "investigador", "iraní",
+    "irlandés", "israelí", "italiano", "japonés", "jefe", "jubilado",
+    "juez", "jugador", "latino", "lector", "libanés", "licenciado",
+    "madrileño", "maestro", "manchego", "marido", "marroquí", "mexicano",
+    "miliciano", "militante", "minero", "ministro", "monje", "moro",
+    "murciano", "médico", "músico", "nacionalista", "navarro", "nieto",
+    "niño", "noruego", "novio", "obispo", "obrero", "oyente", "padrastro",
+    "padrino", "paisano", "panadero", "paquistaní", "parado", "paraguayo",
+    "partidario", "pasajero", "peluquero", "perezoso", "periodista",
+    "perro", "peruano", "polaco", "político", "portugués", "preso",
+    "primo", "prisionero", "profesor", "propietario", "protagonista",
+    "párroco", "refugiado", "reportero", "republicano", "riojano", "rojo",
+    "ruso", "santo", "secretario", "seguidor", "sevillano", "señor",
+    "sindicalista", "sirio", "sirviente", "sobrino", "socialista", "socio",
+    "soldado", "solicitante", "soltero", "sublevado", "sueco", "suegro",
+    "superviviente", "taxista", "temporero", "testigo", "toxicómano",
+    "trabajador", "treintañero", "turco", "turista", "tío", "uruguayo",
+    "usuario", "vago", "valenciano", "vasco", "vecino", "vencido",
+    "vendedor", "venezolano", "viudo", "votante", "víctima", "yerno",
+    "ídolo"
+  ],
+
   stops: ["de","del","a","al","en","con","sin","por","para","que","y","o","como"]
 };
