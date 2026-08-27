@@ -742,7 +742,7 @@ function renderRevisionConfig(){
       el("div",{class:"btn-row"},el("button",{class:"btn primary",onclick:()=>{
         sess={queue:due.slice(0,revLen),i:0,ok:0,wrong:[],back:renderRevisionConfig,label:T.reviewLabel,view:"#view-revision",lid:"rev",silent:false};
         renderQ();
-      }},T.start))):null);
+      }},T.start))):document.createComment("sin repaso pendiente"));
 }
 
 /* ═════════ EXAM ═════════ */
