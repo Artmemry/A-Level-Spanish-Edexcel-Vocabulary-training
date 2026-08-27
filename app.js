@@ -60,6 +60,7 @@ const T={
   alsoPrompt:"también: ",
   phTarget:"tu respuesta en español…", phEn:"your answer in English…",
   check:"Comprobar", next:"Siguiente →",
+  genderTier:v=>"Correcto — la otra forma también vale. La lista da: «"+v+"».",
   exact:"Exacto.", accentTier:"Bien — pero cuidado con las tildes.",
   artTier:"La palabra es correcta — revisa el artículo.",
   artWrong:"El artículo no es correcto — el género cuenta como gramática.",
@@ -386,6 +387,109 @@ function synGlosses(entry){
 const ANSWER_FORMS=new Set();
 CORPUS.forEach(e=>e[K].forEach(v=>ANSWER_FORMS.add(stripAcc(stripArt(normFr(v))))));
 
+/* ───────── gender layer (data/genero.js, optional) ─────────
+   The corpus keeps one form per entry — "el empleado". A student who
+   answers "la empleada" is right, so the other form is derived here and
+   accepted. The lists are never touched: what widens is only what counts
+   as correct, and the answer shown is still the one the teacher wrote.
+
+   Three things keep it honest:
+     · article and ending must agree, so "la empleado" still fails on the
+       article, exactly as before;
+     · a derived form that is a *different word already in the corpus* is
+       refused — el puerto/la puerta, el modo/la moda — unless the two
+       share an English meaning;
+     · anything the rules get wrong can be pinned in the data file. */
+const _G = (typeof window!=="undefined" && window.GENERO) ? window.GENERO : null;
+const G_PAIR = {}, G_BLOCK = {};
+if(_G){
+  (_G.pairs||[]).forEach(p=>{ const m=p[0], f=p[1];
+    (G_PAIR[m]=G_PAIR[m]||[]).push(f); (G_PAIR[f]=G_PAIR[f]||[]).push(m); });
+  (_G.excepciones||_G.exceptions||[]).forEach(p=>{
+    if(typeof p === "string") G_BLOCK[p]=1; else p.forEach(w=>{ G_BLOCK[w]=1; }); });
+}
+/* every answer form in the corpus, with the meanings it carries, so a
+   derived form can be checked against words that already exist */
+const FORM_SENSE = {};
+CORPUS.forEach(e=>e[K].forEach(v=>{
+  const k = stripAcc(stripArt(normFr(v)));
+  (FORM_SENSE[k] = FORM_SENSE[k] || new Set());
+  e.en.forEach(g=>FORM_SENSE[k].add(xCanonEn(g)));
+}));
+
+function gOther(w){                       // the other gender of one word
+  const out = new Set();
+  (G_PAIR[w]||[]).forEach(x=>out.add(x));
+  /* a blocked word keeps its hand-written partner, if it has one, but the
+     regular rules are not allowed to invent a form for it */
+  if(!_G || G_BLOCK[w]) return out;
+  if((_G.invariable||[]).some(s=>s && w.endsWith(s) && w.length>s.length)) out.add(w);
+  (_G.suffixes||[]).forEach(p=>{
+    const m=p[0], f=p[1];
+    if(f && w.endsWith(f) && w.length>f.length) out.add(w.slice(0,w.length-f.length)+m);
+    if(m && w.endsWith(m) && w.length>m.length) out.add(w.slice(0,w.length-m.length)+f);
+    if(!m && f) out.add(w+f);
+  });
+  return out;
+}
+function gWordForms(w){                   /* singular or plural */
+  const pl = /(es|s)$/.exec(w);
+  if(pl && w.length > pl[0].length + 2){
+    const base = w.slice(0, w.length-pl[0].length), out = new Set();
+    gOther(base).forEach(x=>{ if(x!==base) out.add(x + pl[0]); });
+    gOther(w).forEach(x=>out.add(x));
+    return out;
+  }
+  return gOther(w);
+}
+function genderForms(v){
+  if(!_G) return [];
+  const m = v.match(CFG.artRe), art = m ? m[0] : "";
+  const bare = v.slice(art.length).trim();
+  if(!bare) return [];
+  const arts = [];
+  (_G.arts||[]).forEach(p=>{
+    const a=p[0], b=p[1];
+    if(art.trim()===a && b!==a) arts.push(b+" ");
+    else if(art.trim()===b && b!==a) arts.push(a+" ");
+  });
+  if(!art) arts.push("");
+  if(!arts.length) return [];
+  const words = bare.split(" "), stops = _G.stops||[];
+  const heads = gWordForms(words[0]);
+  if(!heads.size) return [];
+  const out = [];
+  heads.forEach(h=>{
+    let rest = "", agreeing = true;
+    for(let i=1;i<words.length;i++){
+      const w = words[i];
+      if(agreeing && stops.indexOf(w)<0){
+        const alt = gWordForms(w);
+        if(alt.size){ rest += " " + Array.from(alt)[0]; continue; }
+      }
+      agreeing = false; rest += " " + w;
+    }
+    arts.forEach(a=>{ const cand = (a+h+rest).trim(); if(cand!==v) out.push(cand); });
+  });
+  return out;
+}
+function genderTier(raw, variants, entry){
+  const senses = new Set((entry&&entry.en||[]).map(xCanonEn));
+  for(let i=0;i<variants.length;i++){
+    const v = normFr(variants[i]);
+    const alts = genderForms(v);
+    for(let j=0;j<alts.length;j++){
+      const alt = alts[j];
+      if(raw!==alt && stripAcc(raw)!==stripAcc(alt)) continue;
+      /* refuse a form that is a different word already in the corpus */
+      const known = FORM_SENSE[stripAcc(stripArt(alt))];
+      if(known && !Array.from(known).some(g=>senses.has(g))) continue;
+      return {q:5, msg:T.genderTier(variants[i]), cls:"good"};
+    }
+  }
+  return null;
+}
+
 /* ───────── answer checking ───────── */
 function frTiers(raw, variants, allowFuzzy){
   const vars=variants.map(normFr);
@@ -410,11 +514,17 @@ function checkFr(ans, entry, promptedGloss){
   const raw=normFr(ans); if(!raw)return null;
   const rawForm=stripAcc(stripArt(raw));
   const own=frTiers(raw, entry[K], false);
+  /* a common-gender noun (el/la periodista) reaches the article check
+     first and is failed on the article; the gender tier outranks that. */
+  const gen=genderTier(raw, entry[K], entry);
+  if(gen && (!own || own.q<4)) return gen;
   if(own) return own;
   const sibs=(GLOSS_TO_ENTRIES[xCanonEn(promptedGloss||entry.en[0])]||[]).filter(x=>x.id!==entry.id);
   for(const s of sibs){
     const hit=frTiers(raw, s[K], false);
     if(hit) return {...hit, alt:s};
+    const gsib=genderTier(raw, s[K], s);
+    if(gsib) return {...gsib, alt:s};
   }
   // curated synonym layer: any interchangeable form for this entry's sense
   const syn=synVariants(entry);
