@@ -167,9 +167,25 @@ footer.site{max-width:1180px;margin:0 auto;padding:20px;border-top:1px solid var
   clearing site data, or opening the page on another machine, starts it empty — use the backup button to move it.
 </footer>
 
+<script src="data/corpus.js"></script>
 <script>
 (function(){
 "use strict";
+
+/* Lesson titles, read from the corpus this page is deployed beside. Both
+   languages number their units U1..U12, so a title is only shown for codes
+   in the same language as the local corpus. */
+const LESSON_TITLES = {}; let CORPUS_LANG = null;
+(function(){
+  const C = window.CORPUS;
+  if(!Array.isArray(C) || !C.length) return;
+  CORPUS_LANG = C[0].es ? "ES" : C[0].fr ? "FR" : null;
+  C.forEach(e=>{ if(e.lesson && !LESSON_TITLES[e.lesson]) LESSON_TITLES[e.lesson] = e.lessonTitle; });
+})();
+function lessonLabel(lid, lang){
+  const t = (lang === CORPUS_LANG) ? LESSON_TITLES[lid] : null;
+  return t ? lid + " &middot; " + esc(t) : esc(lid);
+}
 
 /* ============================================================
    CODE FORMATS
@@ -443,7 +459,7 @@ function detailBlock(studs, g){
       l.slice().sort((a,b)=>String(a[0]).localeCompare(String(b[0]),undefined,{numeric:true}))
        .forEach(r=>{
         const acc = r[3]!=null ? r[3] : pct(r[1]||0, r[2]||0);
-        inner += '<tr><td>'+esc(r[0])+'</td><td class="num">'+(r[1]||0)+'</td>'
+        inner += '<tr><td>'+lessonLabel(String(r[0]), g.lang)+'</td><td class="num">'+(r[1]||0)+'</td>'
                + '<td class="num">'+(r[2]||0)+'</td>'
                + '<td class="num">'+bar(acc)+acc+' %</td></tr>';
        });
