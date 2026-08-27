@@ -61,6 +61,7 @@ const T={
   phTarget:"tu respuesta en español…", phEn:"your answer in English…",
   check:"Comprobar", next:"Siguiente →",
   genderTier:v=>"Correcto — la otra forma también vale. La lista da: «"+v+"».",
+  artSwap:v=>"Exacto — la lista da: «"+v+"».",
   exact:"Exacto.", accentTier:"Bien — pero cuidado con las tildes.",
   artTier:"La palabra es correcta — revisa el artículo.",
   artWrong:"El artículo no es correcto — el género cuenta como gramática.",
@@ -453,15 +454,20 @@ function genderForms(v){
   const m = v.match(CFG.artRe), art = m ? m[0] : "";
   const bare = v.slice(art.length).trim();
   if(!bare) return [];
-  const arts = [];
-  (_G.arts||[]).forEach(p=>{
-    const a=p[0], b=p[1];
-    /* les/des are the same in both genders: the article is kept, the word
-       still changes, so the pair is pushed even when a === b */
-    if(art.trim()===a) arts.push(b+" ");
-    else if(art.trim()===b) arts.push(a+" ");
-  });
-  if(!art) arts.push("");
+  /* Every article of the opposite gender in the same number, not just the
+     one paired in the table: from "el empleado" a student may well write
+     "una empleada", and in French "l'" hides the gender entirely. */
+  const arts = [], cls = art ? artClass(art) : null;
+  if(art){
+    if(!cls) return [];
+    const want = cls[0]==="m" ? "f" : cls[0]==="f" ? "m" : "?";
+    Object.keys(ART_CLASS).forEach(a=>{
+      const c = ART_CLASS[a];
+      if(c[1] !== cls[1]) return;                       // keep the number
+      if(want==="?" || c[0]===want || c[0]==="?")
+        arts.push(a + (/'$/.test(a) ? "" : " "));
+    });
+  } else arts.push("");
   if(!arts.length) return [];
   const words = bare.split(" "), stops = _G.stops||[];
   /* An article means the head is a noun, and most nouns have no other
@@ -515,6 +521,22 @@ function genderTier(raw, variants, entry){
   return null;
 }
 
+/* An article carries two things a vocabulary test cares about: gender and
+   number. It also carries definiteness, which it does not. "le chanteur" and
+   "un chanteur" are the same word correctly recalled; so are "un employe" and
+   "l'employe", where the elided article hides the gender altogether. The
+   marker used to compare the two articles as strings and fail anything that
+   did not match, then blame the gender — which was often right.
+   Each article is now read as gender + number. Only a real disagreement is
+   marked wrong; "?" means the article does not say, and agrees with either. */
+var ART_CLASS = {"el":"ms","la":"fs","los":"mp","las":"fp","un":"ms","una":"fs","unos":"mp","unas":"fp","lo":"ns"};
+function artClass(a){ return ART_CLASS[String(a).trim()] || null; }
+function artCompatible(a, b){
+  var x = artClass(a), y = artClass(b);
+  if(!x || !y) return false;                 // an article we do not know: keep the old verdict
+  if(x[1] !== y[1]) return false;            // singular against plural is a real mistake
+  return x[0] === y[0] || x[0] === "?" || y[0] === "?";
+}
 /* ───────── answer checking ───────── */
 function frTiers(raw, variants, allowFuzzy){
   const vars=variants.map(normFr);
@@ -526,7 +548,10 @@ function frTiers(raw, variants, allowFuzzy){
     const varHasArt = target && target!==stripArt(target);
     if(rawHasArt && varHasArt){
       const ra=raw.match(CFG.artRe)[0], va=target.match(CFG.artRe)[0];
-      if(ra!==va) return {q:1,msg:T.artWrong,cls:"bad"};
+      if(ra!==va){
+        if(artCompatible(ra,va)) return {q:5,msg:T.artSwap(target),cls:"good"};
+        return {q:1,msg:T.artWrong,cls:"bad"};
+      }
     }
     if(rawHasArt && !varHasArt) return {q:5,msg:T.exact,cls:"good"};
     return {q:3,msg:T.artTier,cls:"good"};
