@@ -1204,5 +1204,49 @@ function restoreBackup(){
   inp.click();
 }
 
-go("accueil");
+/* ───────── deep links ─────────
+   A homework link has to land on one list, not on the front page. The hash
+   carries a lesson id — #U6.1 opens that list's start screen, #U6 opens the
+   unit with its lists showing — so a cell in the scheme of work can point a
+   student straight at the words they were set.
+
+   Ids are matched case-insensitively, and #U6.1/practicar deals the first
+   card immediately. An id that no longer exists falls back to the front page
+   rather than a blank screen, so a link in an old spreadsheet still works. */
+function deepLink(){
+  /* Both forms are accepted. The fragment is the tidy one; the query string
+     is the one that survives being pasted through Teams, SharePoint and mail
+     clients, some of which drop everything after the #. */
+  var h = "";
+  try {
+    h = decodeURIComponent((location.hash || "").replace(/^#\/?/, "")).trim();
+    if(!h){
+      var q = /[?&](?:l|lista|liste|lesson|lec|list)=([^&]+)/i.exec(location.search || "");
+      if(q) h = decodeURIComponent(q[1]).trim();
+    }
+  } catch(e){ h = (location.hash || "").replace(/^#\/?/, "").trim(); }
+  if(!h) return false;
+  var go2 = /\/(practicar|practise|pratiquer|go)$/i.test(h);
+  h = h.replace(/\/(practicar|practise|pratiquer|go)$/i, "");
+  var m = /^([A-Za-z][A-Za-z0-9]*)(?:[.\-_](\d+))?$/.exec(h);
+  if(!m) return false;
+  var uid = UNIT_ORDER.filter(function(u){ return u.toLowerCase() === m[1].toLowerCase(); })[0];
+  if(!uid) return false;
+  if(m[2]){
+    var lid = uid + "." + m[2];
+    if(UNITS[uid] && UNITS[uid].lessons[lid]){
+      startLesson(uid, lid);
+      if(go2){ var b = document.querySelector("#view-accueil .btn.primary"); if(b) b.click(); }
+      return true;
+    }
+  }
+  openUnit = uid;                       // unknown lesson: show the unit, not nothing
+  go("accueil");
+  var t = document.querySelector("#view-accueil .unit-tile");
+  if(t && t.scrollIntoView) try{ t.scrollIntoView({block:"start"}); }catch(e){}
+  return true;
+}
+window.addEventListener("hashchange", function(){ deepLink() || go("accueil"); });
+
+if(!deepLink()) go("accueil");
 })();
