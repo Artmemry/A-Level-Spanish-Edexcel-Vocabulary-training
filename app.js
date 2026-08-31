@@ -1154,9 +1154,12 @@ function claimPanel(){
     /* The report rides on the form the student already uses, and carries their
        progress code with it, so the code question can stay compulsory. */
     const b=el("button",{class:"btn",onclick:()=>{
+      /* a field id that is not filled in is left out, rather than sent as an
+         "&=" pair that Forms cannot read */
       let u=CFG.FORMS_URL
-        +"&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName)
         +"&"+CFG.FORMS_FIELD_FLAG+"="+encodeURIComponent(p.map(claimLine).join("  |  "));
+      if(CFG.FORMS_FIELD_NAME)
+        u+="&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName);
       try{ if(CFG.FORMS_FIELD_CODE)
         u+="&"+CFG.FORMS_FIELD_CODE+"="+encodeURIComponent(buildExportCode()); }catch(e){}
       window.open(u,"_blank");
