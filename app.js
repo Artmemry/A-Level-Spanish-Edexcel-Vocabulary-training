@@ -22,7 +22,7 @@ const CFG={
   ALERT_URL:"",
   /* Optional. The field id of one extra question on the Forms form, which then
      carries the report in words instead of inside the code. */
-  FORMS_FIELD_FLAG:"",
+  FORMS_FIELD_FLAG:"r93f547c6c0984f949ff3e2c266090969",
   FORMS_FIELD_CODE:""
 };
 /*CFG-END*/
@@ -1151,10 +1151,15 @@ function claimPanel(){
       p.map(c=>el("div",{style:"padding:3px 0"},claimLine(c)))),
     el("p",{class:"lede",style:"margin:8px 0 0"},sentAuto?T.flagAuto:T.flagLede));
   if(!sentAuto && CFG.FORMS_URL && CFG.FORMS_FIELD_FLAG){
+    /* The report rides on the form the student already uses, and carries their
+       progress code with it, so the code question can stay compulsory. */
     const b=el("button",{class:"btn",onclick:()=>{
-      window.open(CFG.FORMS_URL
+      let u=CFG.FORMS_URL
         +"&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName)
-        +"&"+CFG.FORMS_FIELD_FLAG+"="+encodeURIComponent(p.map(claimLine).join(" | ")),"_blank");
+        +"&"+CFG.FORMS_FIELD_FLAG+"="+encodeURIComponent(p.map(claimLine).join("  |  "));
+      try{ if(CFG.FORMS_FIELD_CODE)
+        u+="&"+CFG.FORMS_FIELD_CODE+"="+encodeURIComponent(buildExportCode()); }catch(e){}
+      window.open(u,"_blank");
       markClaimsSent(); b.disabled=true; b.textContent=T.flagSent;
     }},T.flagSend);
     card.append(el("div",{class:"btn-row"},b));
