@@ -17,12 +17,20 @@ const CFG={
   stop:"el la los las un una unos unas de del al a en y e o u que se lo le les me te nos os su sus mi mis tu tus es son ser estar esta estan como por para con sin mas muy ya he ha han hay tan todo toda todos todas sobre hasta desde entre cuando donde aqui alli este esta esto ese esa eso",
   FORMS_URL:"https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=dBTLADSljUaCn2NuzjLCTEWSzXdNOvRDicS2YScslGFUMzhIUlZJRThXRUQ3RTVQMlFUUFk2UTJWNyQlQCNjPTEu",
   FORMS_FIELD_NAME:"",   // empty = code is copied and pasted by hand
+  /* Optional. Paste the URL of a Power Automate "When an HTTP request is received"
+     flow here and a signalled answer is posted to it silently. Empty = nothing is sent. */
+  ALERT_URL:"",
+  /* Optional. The field id of one extra question on the Forms form, which then
+     carries the report in words instead of inside the code. */
+  FORMS_FIELD_FLAG:"",
   FORMS_FIELD_CODE:""
 };
 /*CFG-END*/
 
 /*T-START*/
 const T={
+  flagTitle:"Has marcado respuestas", flagLede:"Tu profesor las verá en tu código de progreso.",
+  flagSend:"Avisar a mi profesor ahora", flagSent:"Enviado ✓", flagAuto:"Tu profesor ya ha sido avisado.",
   padLabel:"Tildes y signos españoles",
   audioLabel:"Audio", audioTitle:"Pronunciar automáticamente la palabra en español",
   audioTest:"audio activado",
@@ -251,6 +259,13 @@ const SYN_TOK={};
 function tokMatch(a,b){
   if(a===b)return true;
   if(SYN_TOK[a]&&SYN_TOK[a].has(b))return true;
+  /* Same root, different derivation: prosecution / prosecutor, investigation /
+     investigating. Seven shared letters is long enough that "manage" and
+     "manager" are not caught by it. */
+  if(a.length>=8 && b.length>=8){
+    let i=0; while(i<a.length && i<b.length && a[i]===b[i]) i++;
+    if(i>=7) return true;
+  }
   return Math.max(a.length,b.length)>=4 && levDist(a,b,1)<=1;   // phrase scoring only
 }
 function overlap(ansT, expT){
@@ -283,6 +298,31 @@ function bestOverlap(ans, list, tokFn){
   return best;
 }
 function stripEnLead(s){return s.replace(/^(the |a |an |to )/,"")}
+/* Two English words are the same word if stripping a regular inflection from
+   each leaves a shared stem of at least three letters. This accepts
+   unify/unified/unifies/unifying and refuses manage/manager, person/personal. */
+const EN_SUFFIX = ["","s","es","ed","d","ing","ies","ied","ying","y","ly"];
+function enRoots(w){
+  const out = new Set();
+  EN_SUFFIX.forEach(sfx=>{
+    if(!sfx){ out.add(w); return; }
+    if(w.length > sfx.length + 2 && w.slice(-sfx.length) === sfx)
+      out.add(w.slice(0, w.length - sfx.length));
+  });
+  return out;
+}
+function sameEnWord(a, b){
+  const A=String(a).trim().split(/\s+/), B=String(b).trim().split(/\s+/);
+  if(A.length !== B.length || !A.length) return false;
+  for(let i=0;i<A.length;i++){
+    if(A[i]===B[i]) continue;
+    const ra=enRoots(A[i]), rb=enRoots(B[i]);
+    let hit=false;
+    ra.forEach(x=>{ if(x.length>=3 && rb.has(x)) hit=true; });
+    if(!hit) return false;
+  }
+  return true;
+}
 function levDist(a,b,max){
   if(a===b)return 0;
   if(Math.abs(a.length-b.length)>max)return max+1;
@@ -298,6 +338,19 @@ function levDist(a,b,max){
   }
   return prev[b.length];
 }
+/* A negating prefix is a meaning, not a slip: "employment" is not a misspelling of
+   "unemployment", nor "heureux" of "malheureux". Two words that differ by exactly
+   one of these are never treated as a typo. */
+var NEG_PREFIX = ["un","in","im","il","ir","dis","non","mis","de","des","d\u00e9","d\u00e9s","mal","anti","a"];
+function negFlip(a,b){
+  var s = a.length < b.length ? a : b, l = a.length < b.length ? b : a;
+  if(l.length <= s.length) return false;
+  for(var i=0;i<NEG_PREFIX.length;i++){
+    var p = NEG_PREFIX[i];
+    if(l.length === s.length + p.length && l.slice(0,p.length) === p && l.slice(p.length) === s) return true;
+  }
+  return false;
+}
 function nearMiss(a,b){ // grammar-safe: suffix zone (last 2 chars of each word) must match exactly
   const ta=a.split(" "), tb=b.split(" ");
   if(ta.length!==tb.length) return false;
@@ -306,6 +359,7 @@ function nearMiss(a,b){ // grammar-safe: suffix zone (last 2 chars of each word)
   for(let i=0;i<ta.length;i++){
     const wa=ta[i], wb=tb[i];
     if(wa===wb) continue;
+    if(negFlip(wa,wb)) return false;                 // un- / in- / dé- is a meaning, not a typo
     if(Math.max(wa.length,wb.length)<5) return false;
     if(wa.slice(-2)!==wb.slice(-2)) return false;
     const d=levDist(wa.slice(0,-2), wb.slice(0,-2), 2);
@@ -342,10 +396,21 @@ const SYN_TG_IDX={}, SYN_EN_IDX={};
   const rec={words,gate};
   words.forEach(w=>{const k=synNorm(w);(SYN_TG_IDX[k]=SYN_TG_IDX[k]||[]).push(rec)});
 });
+/* The marker forgives a leading "to" or "the", but the synonym index must not:
+   "to shoot" (fusiller) and "the shoot" (le tournage) are different words, and a
+   group written for one must never fire on the other. */
+function synKeyEn(s){
+  const t=String(s).toLowerCase().trim();
+  const p=/^to\s/.test(t)?"v|":/^(the|a|an)\s/.test(t)?"n|":"|";
+  return p+xCanonEn(s);
+}
 (_SY.en||[]).forEach(g=>{
   const words=Array.isArray(g)?g:(g.w||[]);
-  const rec={words};
-  words.forEach(w=>{const k=xCanonEn(w);(SYN_EN_IDX[k]=SYN_EN_IDX[k]||[]).push(rec)});
+  /* "for" narrows a group to the senses named, so that the TV "channel" does not
+     make "station" right for la Manche. */
+  const gate=Array.isArray(g)?null:(g.for||[]).map(xCanonEn);
+  const rec={words,gate};
+  words.forEach(w=>{const k=synKeyEn(w);(SYN_EN_IDX[k]=SYN_EN_IDX[k]||[]).push(rec)});
 });
 function gateOk(gate, entry){
   if(!gate||!gate.length) return true;
@@ -365,7 +430,8 @@ function synVariants(entry){
 function synGlosses(entry){
   const own=new Set(entry.en.map(xCanonEn)), out=[];
   entry.en.forEach(g=>{
-    (SYN_EN_IDX[xCanonEn(g)]||[]).forEach(rec=>{
+    (SYN_EN_IDX[synKeyEn(g)]||[]).forEach(rec=>{
+      if(!gateOk(rec.gate,entry))return;
       rec.words.forEach(w=>{ if(!own.has(xCanonEn(w)) && out.indexOf(w)<0) out.push(w); });
     });
   });
@@ -616,6 +682,24 @@ function checkEn(ans, entry){
     return {q:5,msg:T.exact,cls:"good"};
   if(vars.some(v=>nearMiss(stripEnLead(v),stripEnLead(raw))))
     return {q:4,msg:T.enTypo,cls:"good"};
+  /* Same word, another form: unify / unifies / unified / unifying. Only real
+     inflections count — "manage" still does not accept "manager". */
+  if(vars.some(v=>sameEnWord(stripEnLead(v), stripEnLead(raw))))
+    return {q:5,msg:T.exact,cls:"good"};
+  /* A gloss of three content words or more is a small paraphrase problem, not a
+     spelling one, so it is marked on meaning like a phrase. */
+  if(!isPhrase(entry)){
+    let best={r:0,p:0,n:0};
+    [...pool].forEach(g=>{ const t=enToks(g);
+      if(t.length<3) return;
+      const sc=overlap(enToks(ans), t);
+      if(sc.r>best.r||(sc.r===best.r&&sc.p>best.p)) best={...sc,n:t.length}; });
+    if(best.n>=3){
+      const bar=phraseBars(best.n);
+      if(best.r>=bar.full && best.p>=0.4)  return {q:5,msg:T.exact,cls:"good"};
+      if(best.r>=bar.part && best.p>=0.25) return {q:3,msg:T.senseTier,cls:"good"};
+    }
+  }
   if(isPhrase(entry)){                       // meaning-level marking for quotations/expressions
     let best={r:0,p:0,n:0};
     [...pool].forEach(g=>{ const t=enToks(g); const s=overlap(enToks(ans),t);
@@ -997,12 +1081,20 @@ function renderQ(){
           el("b",null,e[K].join(" ; "))," ",speakBtn(e[K][0],true)," — ",e.en.join(" ; ")));
     /* Translation of a phrase has many valid renderings; where the automatic
        check can't decide, the student judges against the model answer. */
-    if(isPhrase(e) && res.q<4){
+    /* Any card can be glossed with one English word where several are right —
+       "unbowed" for "unsubdued". The student judges against the model answer,
+       and the claim is recorded so the list can be corrected. */
+    if(res.q<4){
       const sg=el("button",{class:"btn small ghost",style:"margin-top:10px",onclick:()=>{
         const r=srsGet(rk(e.id, dict?"enfr":dir));
         r.seen--; if(res.q>=3)r.ok--;                 // undo the automatic mark
         srsGrade(e.id, dict?"enfr":dir, 4);
         if(res.q<3){ sess.ok++; const i=sess.wrong.lastIndexOf(e.id); if(i>=0)sess.wrong.splice(i,1); }
+        S.claims = S.claims || [];
+        S.claims.push({id:e.id, d:(dict?"enfr":dir), a:String(inp.value||"").slice(0,60),
+                       g:e.en[0], t:Date.now()});
+        if(S.claims.length>60) S.claims = S.claims.slice(-60);
+        save();
         sg.disabled=true; sg.textContent=T.selfDone; fb.className="feedback good";
       }},T.selfOk);
       fb.append(sg);
@@ -1024,6 +1116,52 @@ function nextBtn(){
   setTimeout(()=>b.focus(),50);
   return el("div",{class:"btn-row"},b);
 }
+
+/* ---- Signalled answers -------------------------------------------------
+   A student pressing "my version counts too" is telling the teacher the list
+   is wrong. That has to reach the teacher without waiting for them to hand a
+   code in, so the claims are batched and sent once, at the end of the lesson. */
+function pendingClaims(){ return (S.claims||[]).filter(c=>!c.s); }
+function markClaimsSent(){ (S.claims||[]).forEach(c=>c.s=1); save(); }
+function claimLine(c){
+  const e=byId[c.id];
+  return (e?e[K][0]:c.id)+" ["+c.id+"] — "+c.g+" \u2192 "+c.a;
+}
+function pushAlert(){
+  const p=pendingClaims();
+  if(!p.length || !CFG.ALERT_URL) return false;
+  try{
+    fetch(CFG.ALERT_URL,{method:"POST",mode:"no-cors",keepalive:true,
+      headers:{"Content-Type":"text/plain;charset=UTF-8"},
+      body:JSON.stringify({app:CFG.prefix,lang:CFG.key,
+        who:S.name||T.noName, sid:S.sid||"", when:new Date().toISOString(),
+        items:p.map(c=>({id:c.id, word:(byId[c.id]?byId[c.id][K][0]:""),
+                         list:c.g, typed:c.a, dir:c.d}))})});
+    markClaimsSent();
+    return true;
+  }catch(e){ return false; }            // never let this break the lesson
+}
+function claimPanel(){
+  const p=pendingClaims();
+  if(!p.length) return null;
+  const sentAuto=pushAlert();
+  const card=el("div",{class:"card",style:"margin-top:14px;border-color:var(--or,#c07a00)"},
+    el("h3",null,"\u2691 "+T.flagTitle),
+    el("div",{style:"margin-top:6px;font-size:.9rem"},
+      p.map(c=>el("div",{style:"padding:3px 0"},claimLine(c)))),
+    el("p",{class:"lede",style:"margin:8px 0 0"},sentAuto?T.flagAuto:T.flagLede));
+  if(!sentAuto && CFG.FORMS_URL && CFG.FORMS_FIELD_FLAG){
+    const b=el("button",{class:"btn",onclick:()=>{
+      window.open(CFG.FORMS_URL
+        +"&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName)
+        +"&"+CFG.FORMS_FIELD_FLAG+"="+encodeURIComponent(p.map(claimLine).join(" | ")),"_blank");
+      markClaimsSent(); b.disabled=true; b.textContent=T.flagSent;
+    }},T.flagSend);
+    card.append(el("div",{class:"btn-row"},b));
+  }
+  return card;
+}
+addEventListener("pagehide", ()=>{ try{ pushAlert(); }catch(e){} });
 function sessionEnd(v){
   hidePad();
   v.innerHTML="";
@@ -1037,6 +1175,7 @@ function sessionEnd(v){
       el("div",{style:"margin-top:8px"},
         [...new Set(sess.wrong)].map(id=>el("div",{style:"padding:4px 0;border-bottom:1px solid var(--line)"},
           el("b",null,byId[id][K].join(" ; "))," ",speakBtn(byId[id][K][0],true)," — ",byId[id].en.join(" ; "))))):null,
+    claimPanel(),
     el("div",{class:"btn-row"},
       el("button",{class:"btn primary",onclick:sess.back},T.cont),
       el("button",{class:"btn",onclick:()=>go("suivi")},T.seeProgress)));
@@ -1176,7 +1315,10 @@ function buildExportCode(){
   }));
   const x=S.exams.slice(-5).map(e2=>[Math.round(e2.t/DAY),e2.pct,e2.n]);
   const a2=assignment();
+  /* answers the student claimed were also right — the teacher decides */
+  const cl=(S.claims||[]).slice(-25).map(c=>[c.id,c.a,c.g]);
   const payload={v:2,n:S.name||T.noName,t:Date.now(),
+    c:cl,
     o:{seen:CORPUS.map(e=>e.id).filter(isSeen).length,total:CORPUS.length,
        mast:CORPUS.map(e=>e.id).filter(isMastered).length,sess:S.sessions.length,lee:leeches().length},
     u,l,x, a:a2?{lab:a2.label,done:a2.done}:null};
@@ -1184,6 +1326,11 @@ function buildExportCode(){
   if(code.length>3800){ // MS Forms long-answer safety: keep weakest 30 lessons
     payload.l=l.slice().sort((p,q2)=>p[3]-q2[3]).slice(0,30);
     payload.lt=true;
+    code=CFG.prefix+btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+  }
+  /* Still long: the claims are the next thing to go, keep the most recent few. */
+  if(code.length>3800 && payload.c && payload.c.length>8){
+    payload.c=payload.c.slice(-8);
     code=CFG.prefix+btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   }
   return code;
