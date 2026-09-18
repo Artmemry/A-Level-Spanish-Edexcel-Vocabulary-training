@@ -35,70 +35,74 @@ const CFG={
 /*CFG-END*/
 
 /*T-START*/
-/* The interface is scaffolding, not an assessment: a student should never have
-   to decode a button in order to practise. Everything the site says about
-   itself is in English. The Spanish is the content — the words, the prompts,
-   the answers — and that is where the work belongs. */
+/* Two languages, one rule.
+   SPANISH for the words a student meets every lesson and should own: the tabs,
+   the buttons, the labels — enviar, atrás, salir, empezar la lección,
+   comprobar, siguiente, vistas, dominadas, precisión. Reading those IS part of
+   the course.
+   ENGLISH for the sentences: what a screen is asking of you, what the marking
+   is telling you, and what your teacher has or has not received. Nobody should
+   have to decode an explanation before they can act on it. */
 const T={
-  /* ── report to the teacher ── */
+  /* ── report to the teacher: the sentences are English, the buttons are not ── */
   barNever:"Your teacher has not received anything from you yet.",
   barWaiting:(n,ago)=>"Sent "+ago+" · "+n+" activit"+(n>1?"ies":"y")+" not sent since then.",
   barClear:ago=>"Sent to your teacher "+ago+" · nothing waiting.",
   barUnsent:n=>n+" activit"+(n>1?"ies":"y")+" still to send.",
-  barSend:"Send now",
-  barSending:"Opening the form…",
+  barSend:"Enviar ahora",
+  barSending:"Abriendo el formulario…",
   agoNow:"a moment ago",
   agoMin:n=>n+" minute"+(n>1?"s":"")+" ago",
   agoHour:n=>n+" hour"+(n>1?"s":"")+" ago",
   agoDay:n=>n+" day"+(n>1?"s":"")+" ago",
-  sendPanelTitle:"Send to your teacher",
+  sendPanelTitle:"Enviar a tu profesor",
   sendPanelWhat:(seen,mast,acc)=>"Your teacher will see: "+seen+" words seen, "+mast+" mastered, "+acc+" % accuracy.",
   sendPanelHow:"The form opens with your name and your code already filled in — you just press Submit.",
   sendPanelHowPaste:"Your code is copied for you and the form opens: paste it into the “Code” box and press Submit.",
-  sendPanelGo:"Send to my teacher now",
-  sendPanelDone:"Sent ✓",
+  sendPanelGo:"Enviar a mi profesor",
+  sendPanelDone:"Enviado ✓",
   sendPanelThanks:"Sent. Your teacher will see it in their list.",
-  sendPanelLater:"You can also send it later from Progress.",
+  sendPanelLater:"You can also send it later from Progreso.",
   sendNameHint:"Put your name in so your teacher knows whose code this is.",
   flagTitle:"You flagged some answers", flagLede:"Your teacher will see them in your progress code.",
-  flagSend:"Tell my teacher now", flagSent:"Sent ✓", flagAuto:"Your teacher has already been told.",
-  padLabel:"Spanish accents and signs",
+  flagSend:"Avisar a mi profesor", flagSent:"Enviado ✓", flagAuto:"Your teacher has already been told.",
+  padLabel:"Tildes y signos",
   audioLabel:"Audio", audioTitle:"Say the Spanish word automatically",
-  audioTest:"audio on",
-  voiceLabel:"Voice", voiceHint:"★ = the best voice this device offers. Try the others if it does not convince you.",
-  homeTitle:"Your vocabulary lists",
+  audioTest:"audio activado",
+  voiceLabel:"Voz", voiceHint:"★ = the best voice this device offers. Try the others if it does not convince you.",
+  homeTitle:"Tus listas de vocabulario",
   homeLede:"The lists follow your exercise book exactly: choose a unit, then a lesson. Read the list, or practise by typing your answers — in both directions. Your progress is kept on this device, and at the end of every activity you can send it to your teacher in one click.",
-  nameLabel:"Your name (for the code you send)",
-  namePh:"First name + initial, e.g. Lucía G.",
-  dueCard:n=>n+" word"+(n>1?"s":"")+" due for review today",
-  startReview:"Start the review →",
-  unitsLabel:"Units",
-  unitMeta:(l,w,s,m)=>`${l} lessons · ${w} words · ${s} seen · ${m} mastered`,
-  lessonLine:(n,t,c)=>`Lesson ${n} — ${t} (${c} words)`,
-  lessonMeta:(s,m)=>`${s} seen · ${m} mastered`,
-  accSuffix:" % accuracy",
-  list:"List", practise:"Practise",
-  backUnits:"← Back to the units", practiseThis:"Practise this list",
-  print:"Print",
-  colTarget:"Spanish", colEn:"English", colStatus:"Status",
-  stMast:"mastered", stCur:"in progress", stNew:"not seen",
+  nameLabel:"Tu nombre",
+  namePh:"Nombre + inicial, p. ej. Lucía G.",
+  dueCard:n=>n+" palabra"+(n>1?"s":"")+" por repasar hoy",
+  startReview:"Empezar el repaso →",
+  unitsLabel:"Unidades",
+  unitMeta:(l,w,s,m)=>`${l} lecciones · ${w} palabras · ${s} vistas · ${m} dominadas`,
+  lessonLine:(n,t,c)=>`Lección ${n} — ${t} (${c} palabras)`,
+  lessonMeta:(s,m)=>`${s} vistas · ${m} dominadas`,
+  accSuffix:" % de precisión",
+  list:"Lista", practise:"Practicar",
+  backUnits:"← Volver a las unidades", practiseThis:"Practicar esta lista",
+  print:"Imprimir",
+  colTarget:"Español", colEn:"English", colStatus:"Estado",
+  stMast:"dominada", stCur:"en curso", stNew:"sin ver",
   listLegend:"○ not seen · ◐ in progress · ● mastered (interval ≥ 3 weeks). Forms separated by “ ; ” are interchangeable: any of them counts as correct.",
-  back:"← Back",
-  dirLabel:"Translation direction",
-  dirEnFr:"English → Spanish", dirFrEn:"Spanish → English", dirMix:"Mixed", dirDict:"Dictation 🔊",
+  back:"← Atrás",
+  dirLabel:"Dirección",
+  dirEnFr:"Inglés → Español", dirFrEn:"Español → Inglés", dirMix:"Mixto", dirDict:"Dictado 🔊",
   dictNoTts:"Your browser has no voice — dictation is not available",
-  startLesson:"Start — the whole lesson",
-  reviewTitle:"Today's review",
+  startLesson:"Empezar la lección",
+  reviewTitle:"Repaso del día",
   reviewLede:n=>`${n} card${n>1?"s":""} ${n>1?"have":"has"} come due (all units, production first). Spaced repetition chooses for you.`,
-  reviewEmpty:"Nothing due just now — practise a lesson from Home, and the words will come back here at the right moment.",
-  nWords:"Number of words", all:"All", start:"Start",
-  quit:"← Quit",
-  metaEnFrArt:"English → Spanish (with the article)", metaEnFr:"English → Spanish",
-  metaFrEn:"Spanish → English", metaDict:"dictation — listen and write",
-  replay:"🔊 Listen again",
-  alsoPrompt:"also: ",
-  phTarget:"your answer in Spanish…", phEn:"your answer in English…",
-  check:"Check", next:"Next →",
+  reviewEmpty:"Nothing due just now — practise a lesson from Inicio, and the words will come back here at the right moment.",
+  nWords:"Número de palabras", all:"Todo", start:"Empezar",
+  quit:"← Salir",
+  metaEnFrArt:"inglés → español (con el artículo)", metaEnFr:"inglés → español",
+  metaFrEn:"español → inglés", metaDict:"dictado — escucha y escribe",
+  replay:"🔊 Escuchar otra vez",
+  alsoPrompt:"también: ",
+  phTarget:"tu respuesta en español…", phEn:"your answer in English…",
+  check:"Comprobar", next:"Siguiente →",
   genderTier:v=>"Correct — the other form works too. The list gives: “"+v+"”.",
   artSwap:v=>"Exactly right — the list gives: “"+v+"”.",
   exact:"Exactly right.", accentTier:"Right — but watch the accents.",
@@ -106,44 +110,44 @@ const T={
   artWrong:"The article is wrong — gender counts as grammar.",
   typoTier:"Nearly — check the spelling.", wrong:"No.",
   senseTier:"Right meaning — compare your version with the one in the list.",
-  selfOk:"My version counts too", selfDone:"Accepted ✓",
+  selfOk:"Mi versión también vale", selfDone:"Aceptada ✓",
   phraseNear:"Right meaning — but the exact wording is the one below.",
   enTypo:"Right — small spelling slip.",
   altNote:v=>["Your answer “",v,"”"+" is also in your lists with this meaning — both count."],
   sibNote:"Also in your lists with this meaning: ",
-  sessDone:"Session finished", qs:"questions", right:"correct", prec:"accuracy",
-  toReview:"To review", cont:"Carry on", seeProgress:"See my progress",
-  leechTitle:"Stubborn words", leechCard:n=>`${n} stubborn word${n>1?"s":""} — missed again and again`,
-  leechGo:"Tame them →", leechLabel:"Stubborn",
-  examTab:"Exam", examTitle:"Exam mode",
+  sessDone:"Sesión terminada", qs:"preguntas", right:"acertadas", prec:"precisión",
+  toReview:"Para repasar", cont:"Continuar", seeProgress:"Ver mi progreso",
+  leechTitle:"Palabras rebeldes", leechCard:n=>`${n} word${n>1?"s":""} missed again and again`,
+  leechGo:"Domarlas →", leechLabel:"Rebeldes",
+  examTab:"Examen", examTitle:"Modo examen",
   examLede:"Random questions from the units you choose, both directions, no corrections until the end — like a real exam. The result is kept in your code.",
-  examUnits:"Units in the exam", examStart:"Start the exam",
+  examUnits:"Unidades del examen", examStart:"Empezar el examen",
   examNeedUnits:"Choose at least one unit.",
-  examDone:"Exam finished", examScore:"score", examWrong:"Wrong answers",
-  examGiven:"your answer", examNone:"(blank)", examAgain:"Another exam",
-  taskTitle:"This week's task", taskDone:"done ✓", taskPending:"to do",
-  progressTitle:"Progress",
+  examDone:"Examen terminado", examScore:"nota", examWrong:"Respuestas incorrectas",
+  examGiven:"tu respuesta", examNone:"(en blanco)", examAgain:"Otro examen",
+  taskTitle:"Tarea de la semana", taskDone:"hecha ✓", taskPending:"pendiente",
+  progressTitle:"Progreso",
   progressLede:"Your progress unit by unit, the lessons that need work, and your code to send to your teacher.",
-  kSeen:"words seen / ", kMast:"mastered (≥ 3 wks)", kDue:"reviews due",
-  kProd:"accuracy, production", kRec:"accuracy, recognition",
-  byUnit:"By unit",
-  thUnit:"Unit", thSeen:"Seen", thMast:"Mastered", thAcc:"Accuracy",
-  weakLessons:"Lessons to shore up",
+  kSeen:"palabras vistas / ", kMast:"dominadas (≥ 3 sem.)", kDue:"repasos pendientes",
+  kProd:"precisión, producción", kRec:"precisión, reconocimiento",
+  byUnit:"Por unidad",
+  thUnit:"Unidad", thSeen:"Vistas", thMast:"Dominadas", thAcc:"Precisión",
+  weakLessons:"Lecciones por reforzar",
   weakEmpty:"Not enough yet — practise a few lessons.",
-  weakLine:(u,n)=>`${u} · Lesson ${n}`,
-  examsHist:"Your exams",
-  sendTitle:"Send to your teacher",
-  sendFormsTxt:"Press “Send via MS Forms”: the form opens with your name and your code already filled in — you just press Submit. The code holds your statistics and the name you typed on Home, nothing else.",
-  sendCopyTxt:"Copy this code and send it to your teacher (email, Teams…). It holds your statistics and the name you typed on Home, nothing else.",
-  sendForms:"Send via MS Forms", copyCode:"Copy the code",
-  sendPasteTxt:"Press “Send via MS Forms”: your code is copied for you and the form opens. Paste the code into the “Code” box, type your name and press Submit.",
+  weakLine:(u,n)=>`${u} · Lección ${n}`,
+  examsHist:"Tus exámenes",
+  sendTitle:"Enviar al profesor",
+  sendFormsTxt:"Press “Enviar por MS Forms”: the form opens with your name and your code already filled in — you just press Submit. The code holds your statistics and the name you typed on Inicio, nothing else.",
+  sendCopyTxt:"Copy this code and send it to your teacher (email, Teams…). It holds your statistics and the name you typed on Inicio, nothing else.",
+  sendForms:"Enviar por MS Forms", copyCode:"Copiar el código",
+  sendPasteTxt:"Press “Enviar por MS Forms”: your code is copied for you and the form opens. Paste the code into the “Code” box, type your name and press Submit.",
   formsPasteHint:"Code copied. Paste it into the “Code” box on the form.",
-  backup:"Back up (.json)", restore:"Restore a backup", reset:"Reset",
+  backup:"Copia de seguridad (.json)", restore:"Restaurar copia", reset:"Reiniciar",
   resetConfirm:"Erase all your progress on this device? This cannot be undone.",
   restored:"Backup restored.", badFile:"File not recognised — choose a backup exported from this site.",
-  noName:"(no name)",
-  backupFile:"lexico-progress.json",
-  sessionLabel:(u,n)=>`${u} · Lesson ${n}`, reviewLabel:"Review", examLabel:"Exam"
+  noName:"(sin nombre)",
+  backupFile:"lexico-progreso.json",
+  sessionLabel:(u,n)=>`${u} · Lección ${n}`, reviewLabel:"Repaso", examLabel:"Examen"
 };
 /*T-END*/
 
@@ -884,8 +888,9 @@ function markSent(){
 }
 /* One route out, used by the strip, the end-of-activity panel and Progreso,
    so all three behave the same and all three record the send. */
-async function sendNow(){
+async function sendNow(extra){
   const code = buildExportCode();
+  const tail = extra || "";
   if(!CFG.FORMS_URL){
     try{ await navigator.clipboard.writeText(code); }catch(e){}
     markSent();
@@ -894,7 +899,7 @@ async function sendNow(){
   if(CFG.FORMS_FIELD_NAME && CFG.FORMS_FIELD_CODE){
     window.open(CFG.FORMS_URL
       + "&" + CFG.FORMS_FIELD_NAME + "=" + encodeURIComponent((S.name||"").trim() || T.noName)
-      + "&" + CFG.FORMS_FIELD_CODE + "=" + encodeURIComponent(code), "_blank", "noopener");
+      + "&" + CFG.FORMS_FIELD_CODE + "=" + encodeURIComponent(code) + tail, "_blank", "noopener");
     markSent();
     return "prefilled";
   }
@@ -907,7 +912,14 @@ async function sendNow(){
     ta.remove();
   }
   alert(T.formsPasteHint);
-  window.open(CFG.FORMS_URL, "_blank", "noopener");
+  /* Half a configuration is still worth using: fill in whatever field id is
+     known, and leave the clipboard for the box that is not. */
+  let u = CFG.FORMS_URL + tail;
+  if(CFG.FORMS_FIELD_NAME)
+    u += "&" + CFG.FORMS_FIELD_NAME + "=" + encodeURIComponent((S.name||"").trim() || T.noName);
+  if(CFG.FORMS_FIELD_CODE)
+    u += "&" + CFG.FORMS_FIELD_CODE + "=" + encodeURIComponent(code);
+  window.open(u, "_blank", "noopener");
   markSent();
   return "paste";
 }
@@ -1305,17 +1317,14 @@ function claimPanel(){
   if(!sentAuto && CFG.FORMS_URL && CFG.FORMS_FIELD_FLAG){
     /* The report rides on the form the student already uses, and carries their
        progress code with it, so the code question can stay compulsory. */
-    const b=el("button",{class:"btn",onclick:()=>{
-      /* a field id that is not filled in is left out, rather than sent as an
-         "&=" pair that Forms cannot read */
-      let u=CFG.FORMS_URL
-        +"&"+CFG.FORMS_FIELD_FLAG+"="+encodeURIComponent(p.map(claimLine).join("  |  "));
-      if(CFG.FORMS_FIELD_NAME)
-        u+="&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName);
-      try{ if(CFG.FORMS_FIELD_CODE)
-        u+="&"+CFG.FORMS_FIELD_CODE+"="+encodeURIComponent(buildExportCode()); }catch(e){}
-      window.open(u,"_blank");
-      markClaimsSent(); b.disabled=true; b.textContent=T.flagSent;
+    /* This used to build its own address, and with the code field unset it sent
+       the teacher a report carrying no progress code and left nothing on the
+       clipboard either. It now goes through the one send route, so the flagged
+       answers ride along with the name and the code like everything else. */
+    const b=el("button",{class:"btn",onclick:async()=>{
+      b.disabled=true;
+      await sendNow("&"+CFG.FORMS_FIELD_FLAG+"="+encodeURIComponent(p.map(claimLine).join("  |  ")));
+      markClaimsSent(); b.textContent=T.flagSent;
     }},T.flagSend);
     card.append(el("div",{class:"btn-row"},b));
   }
