@@ -34,6 +34,40 @@ body{
   *,*::before,*::after{animation:none!important; transition:none!important}
 }
 
+/* ── the strip that says what the teacher has ──
+   It sits under the header on every tab, so the answer to "has my teacher
+   seen this?" is never more than a glance away. Amber when something is
+   waiting, green when nothing is. */
+.sendbar{
+  border-bottom:1px solid var(--line-strong);
+  background:var(--bleu-pale);
+  padding:0 20px;
+  font-size:.9rem;
+}
+.sendbar.hidden{display:none}
+.sendbar-inner{
+  max-width:1060px; margin:0 auto; padding:9px 0;
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.sendbar .dot{
+  width:9px; height:9px; border-radius:50%; flex:0 0 auto; background:var(--bleu);
+}
+.sendbar .txt{flex:1; min-width:200px; line-height:1.4}
+.sendbar .txt b{font-weight:600}
+.sendbar .ago{color:var(--ink-soft)}
+.sendbar.waiting{background:#FDF6EC; border-bottom-color:#E4CFA6}
+.sendbar.waiting .dot{background:#B07B12}
+.sendbar.clear{background:var(--vert-pale); border-bottom-color:#BFD9CB}
+.sendbar.clear .dot{background:var(--vert)}
+.sendbar .btn{padding:5px 12px; font-size:.85rem}
+@media print{.sendbar{display:none}}
+
+/* ── the send panel at the end of an activity ── */
+.send-card{margin-top:14px; border-color:var(--bleu)!important}
+.send-card .send-what{font-size:.9rem; color:var(--ink-soft); margin:2px 0 0}
+.send-card .btn.primary{font-size:1rem; padding:10px 18px}
+.send-name{margin-top:10px}
+
 /* ── header ── */
 header.site{
   border-bottom:2px solid var(--ink);

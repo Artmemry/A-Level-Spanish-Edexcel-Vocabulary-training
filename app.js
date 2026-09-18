@@ -16,6 +16,13 @@ const CFG={
   accents:["á","é","í","ó","ú","ñ","ü","¡","¿"],
   stop:"el la los las un una unos unas de del al a en y e o u que se lo le les me te nos os su sus mi mis tu tus es son ser estar esta estan como por para con sin mas muy ya he ha han hay tan todo toda todos todas sobre hasta desde entre cuando donde aqui alli este esta esto ese esa eso",
   FORMS_URL:"https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=dBTLADSljUaCn2NuzjLCTEWSzXdNOvRDicS2YScslGFUMzhIUlZJRThXRUQ3RTVQMlFUUFk2UTJWNyQlQCNjPTEu",
+  /* One click instead of a paste.
+     In MS Forms: ... > Get a link to fill in as the teacher, then Get pre-filled
+     answer. Type anything into the name box and the code box, press Get link, and
+     the URL you are handed carries one "&rXXXXXXXX=" pair per question. Paste the
+     token of the NAME question below, and the token of the CODE question into
+     FORMS_FIELD_CODE. While either is empty the student is asked to paste instead,
+     which still works but costs them a step. */
   FORMS_FIELD_NAME:"",   // empty = code is copied and pasted by hand
   /* Optional. Paste the URL of a Power Automate "When an HTTP request is received"
      flow here and a signalled answer is posted to it silently. Empty = nothing is sent. */
@@ -28,91 +35,115 @@ const CFG={
 /*CFG-END*/
 
 /*T-START*/
+/* The interface is scaffolding, not an assessment: a student should never have
+   to decode a button in order to practise. Everything the site says about
+   itself is in English. The Spanish is the content — the words, the prompts,
+   the answers — and that is where the work belongs. */
 const T={
-  flagTitle:"Has marcado respuestas", flagLede:"Tu profesor las verá en tu código de progreso.",
-  flagSend:"Avisar a mi profesor ahora", flagSent:"Enviado ✓", flagAuto:"Tu profesor ya ha sido avisado.",
-  padLabel:"Tildes y signos españoles",
-  audioLabel:"Audio", audioTitle:"Pronunciar automáticamente la palabra en español",
-  audioTest:"audio activado",
-  voiceLabel:"Voz", voiceHint:"★ = la mejor voz que ofrece este dispositivo. Prueba las demás si no te convence.",
-  homeTitle:"Tus listas de vocabulario",
-  homeLede:"Las listas reproducen exactamente el cuaderno: elige una unidad y luego una lección. Consulta la lista o practica escribiendo tus respuestas — en los dos sentidos. Tu progreso se guarda en este dispositivo; exporta tu código en Progreso para enviárselo al profesor.",
-  nameLabel:"Tu nombre (para el código exportado)",
-  namePh:"Nombre + inicial, p. ej. Lucía G.",
-  dueCard:n=>n+" palabra"+(n>1?"s":"")+" por repasar hoy",
-  startReview:"Empezar el repaso →",
-  unitsLabel:"Unidades",
-  unitMeta:(l,w,s,m)=>`${l} lecciones · ${w} palabras · ${s} vistas · ${m} dominadas`,
-  lessonLine:(n,t,c)=>`Lección ${n} — ${t} (${c} palabras)`,
-  lessonMeta:(s,m)=>`${s} vistas · ${m} dominadas`,
-  accSuffix:" % de precisión",
-  list:"Lista", practise:"Practicar",
-  backUnits:"← Volver a las unidades", practiseThis:"Practicar esta lista",
-  print:"Imprimir",
-  colTarget:"Español", colEn:"English", colStatus:"Estado",
-  stMast:"dominada", stCur:"en curso", stNew:"sin ver",
-  listLegend:"○ sin ver · ◐ en curso · ● dominada (intervalo ≥ 3 semanas). Las formas separadas por « ; » son intercambiables: cualquiera cuenta como correcta.",
-  back:"← Volver",
-  dirLabel:"Dirección de traducción",
-  dirEnFr:"Inglés → Español", dirFrEn:"Español → Inglés", dirMix:"Mixto", dirDict:"Dictado 🔊",
-  dictNoTts:"Tu navegador no ofrece voz — dictado no disponible",
-  startLesson:"Empezar — toda la lección",
-  reviewTitle:"Repaso del día",
-  reviewLede:n=>`${n} tarjeta${n>1?"s":""} han llegado a su fecha de repaso (todas las unidades, producción primero). La repetición espaciada elige por ti.`,
-  reviewEmpty:"Nada que repasar por ahora — practica una lección desde Inicio, y las palabras volverán aquí en el momento adecuado.",
-  nWords:"Número de palabras", all:"Todo", start:"Empezar",
-  quit:"← Salir",
-  metaEnFrArt:"inglés → español (con el artículo)", metaEnFr:"inglés → español",
-  metaFrEn:"español → inglés", metaDict:"dictado — escucha y escribe",
-  replay:"🔊 Escuchar otra vez",
-  alsoPrompt:"también: ",
-  phTarget:"tu respuesta en español…", phEn:"your answer in English…",
-  check:"Comprobar", next:"Siguiente →",
-  genderTier:v=>"Correcto — la otra forma también vale. La lista da: «"+v+"».",
-  artSwap:v=>"Exacto — la lista da: «"+v+"».",
-  exact:"Exacto.", accentTier:"Bien — pero cuidado con las tildes.",
-  artTier:"La palabra es correcta — revisa el artículo.",
-  artWrong:"El artículo no es correcto — el género cuenta como gramática.",
-  typoTier:"Casi — revisa la ortografía.", wrong:"No.",
-  senseTier:"Sentido correcto — compara tu versión con la de la lista.",
-  selfOk:"Mi versión también vale", selfDone:"Aceptada ✓",
-  phraseNear:"Sentido correcto — pero la cita exacta es la de abajo.",
-  enTypo:"Bien — pequeño error de ortografía.",
-  altNote:v=>["Tu respuesta « ",v," » también figura en tus listas con este sentido — las dos valen."],
-  sibNote:"También en tus listas con este sentido: ",
-  sessDone:"Sesión terminada", qs:"preguntas", right:"acertadas", prec:"precisión",
-  toReview:"Para repasar", cont:"Continuar", seeProgress:"Ver mi progreso",
-  leechTitle:"Palabras rebeldes", leechCard:n=>`${n} palabra${n>1?"s":""} rebelde${n>1?"s":""} — falladas una y otra vez`,
-  leechGo:"Domarlas →", leechLabel:"Rebeldes",
-  examTab:"Examen", examTitle:"Modo examen",
-  examLede:"Preguntas al azar de las unidades elegidas, dirección mixta, sin correcciones hasta el final — como en un examen de verdad. El resultado se guarda en tu código.",
-  examUnits:"Unidades del examen", examStart:"Empezar el examen",
-  examNeedUnits:"Elige al menos una unidad.",
-  examDone:"Examen terminado", examScore:"nota", examWrong:"Respuestas incorrectas",
-  examGiven:"tu respuesta", examNone:"(en blanco)", examAgain:"Otro examen",
-  taskTitle:"Tarea de la semana", taskDone:"hecha ✓", taskPending:"pendiente",
-  progressTitle:"Progreso",
-  progressLede:"Tu progreso por unidad, tus lecciones más frágiles y tu código para enviar al profesor.",
-  kSeen:"palabras vistas / ", kMast:"dominadas (≥ 3 sem.)", kDue:"repasos pendientes",
-  kProd:"precisión producción", kRec:"precisión reconocimiento",
-  byUnit:"Por unidad",
-  thUnit:"Unidad", thSeen:"Vistas", thMast:"Dominadas", thAcc:"Precisión",
-  weakLessons:"Lecciones por reforzar",
-  weakEmpty:"Aún no hay datos suficientes — practica algunas lecciones.",
-  weakLine:(u,n)=>`${u} · Lección ${n}`,
-  examsHist:"Tus exámenes",
-  sendTitle:"Enviar al profesor",
-  sendFormsTxt:"Haz clic en « Enviar por MS Forms »: el formulario se abre con tu nombre y tu código ya rellenados — solo te queda pulsar Enviar. El código solo contiene tus estadísticas y el nombre escrito en Inicio.",
-  sendCopyTxt:"Copia este código y envíaselo a tu profesor (correo, Teams…). Solo contiene tus estadísticas y el nombre escrito en Inicio.",
-  sendForms:"Enviar por MS Forms", copyCode:"Copiar el código",
-  sendPasteTxt:"Haz clic en « Enviar por MS Forms »: tu código se copia solo y el formulario se abre. Pega el código en la casilla « Code », escribe tu nombre y pulsa Enviar.",
-  formsPasteHint:"Código copiado. Pégalo en la casilla « Code » del formulario.",
-  backup:"Copia de seguridad (.json)", restore:"Restaurar copia", reset:"Reiniciar",
-  resetConfirm:"¿Borrar todo el progreso en este dispositivo? Esta acción es definitiva.",
-  restored:"Copia restaurada.", badFile:"Archivo no reconocido — elige una copia exportada desde este sitio.",
-  noName:"(sin nombre)",
-  backupFile:"lexico-guardado.json",
-  sessionLabel:(u,n)=>`${u} · Lección ${n}`, reviewLabel:"Repaso", examLabel:"Examen"
+  /* ── report to the teacher ── */
+  barNever:"Your teacher has not received anything from you yet.",
+  barWaiting:(n,ago)=>"Sent "+ago+" · "+n+" activit"+(n>1?"ies":"y")+" not sent since then.",
+  barClear:ago=>"Sent to your teacher "+ago+" · nothing waiting.",
+  barUnsent:n=>n+" activit"+(n>1?"ies":"y")+" still to send.",
+  barSend:"Send now",
+  barSending:"Opening the form…",
+  agoNow:"a moment ago",
+  agoMin:n=>n+" minute"+(n>1?"s":"")+" ago",
+  agoHour:n=>n+" hour"+(n>1?"s":"")+" ago",
+  agoDay:n=>n+" day"+(n>1?"s":"")+" ago",
+  sendPanelTitle:"Send to your teacher",
+  sendPanelWhat:(seen,mast,acc)=>"Your teacher will see: "+seen+" words seen, "+mast+" mastered, "+acc+" % accuracy.",
+  sendPanelHow:"The form opens with your name and your code already filled in — you just press Submit.",
+  sendPanelHowPaste:"Your code is copied for you and the form opens: paste it into the “Code” box and press Submit.",
+  sendPanelGo:"Send to my teacher now",
+  sendPanelDone:"Sent ✓",
+  sendPanelThanks:"Sent. Your teacher will see it in their list.",
+  sendPanelLater:"You can also send it later from Progress.",
+  sendNameHint:"Put your name in so your teacher knows whose code this is.",
+  flagTitle:"You flagged some answers", flagLede:"Your teacher will see them in your progress code.",
+  flagSend:"Tell my teacher now", flagSent:"Sent ✓", flagAuto:"Your teacher has already been told.",
+  padLabel:"Spanish accents and signs",
+  audioLabel:"Audio", audioTitle:"Say the Spanish word automatically",
+  audioTest:"audio on",
+  voiceLabel:"Voice", voiceHint:"★ = the best voice this device offers. Try the others if it does not convince you.",
+  homeTitle:"Your vocabulary lists",
+  homeLede:"The lists follow your exercise book exactly: choose a unit, then a lesson. Read the list, or practise by typing your answers — in both directions. Your progress is kept on this device, and at the end of every activity you can send it to your teacher in one click.",
+  nameLabel:"Your name (for the code you send)",
+  namePh:"First name + initial, e.g. Lucía G.",
+  dueCard:n=>n+" word"+(n>1?"s":"")+" due for review today",
+  startReview:"Start the review →",
+  unitsLabel:"Units",
+  unitMeta:(l,w,s,m)=>`${l} lessons · ${w} words · ${s} seen · ${m} mastered`,
+  lessonLine:(n,t,c)=>`Lesson ${n} — ${t} (${c} words)`,
+  lessonMeta:(s,m)=>`${s} seen · ${m} mastered`,
+  accSuffix:" % accuracy",
+  list:"List", practise:"Practise",
+  backUnits:"← Back to the units", practiseThis:"Practise this list",
+  print:"Print",
+  colTarget:"Spanish", colEn:"English", colStatus:"Status",
+  stMast:"mastered", stCur:"in progress", stNew:"not seen",
+  listLegend:"○ not seen · ◐ in progress · ● mastered (interval ≥ 3 weeks). Forms separated by “ ; ” are interchangeable: any of them counts as correct.",
+  back:"← Back",
+  dirLabel:"Translation direction",
+  dirEnFr:"English → Spanish", dirFrEn:"Spanish → English", dirMix:"Mixed", dirDict:"Dictation 🔊",
+  dictNoTts:"Your browser has no voice — dictation is not available",
+  startLesson:"Start — the whole lesson",
+  reviewTitle:"Today's review",
+  reviewLede:n=>`${n} card${n>1?"s":""} ${n>1?"have":"has"} come due (all units, production first). Spaced repetition chooses for you.`,
+  reviewEmpty:"Nothing due just now — practise a lesson from Home, and the words will come back here at the right moment.",
+  nWords:"Number of words", all:"All", start:"Start",
+  quit:"← Quit",
+  metaEnFrArt:"English → Spanish (with the article)", metaEnFr:"English → Spanish",
+  metaFrEn:"Spanish → English", metaDict:"dictation — listen and write",
+  replay:"🔊 Listen again",
+  alsoPrompt:"also: ",
+  phTarget:"your answer in Spanish…", phEn:"your answer in English…",
+  check:"Check", next:"Next →",
+  genderTier:v=>"Correct — the other form works too. The list gives: “"+v+"”.",
+  artSwap:v=>"Exactly right — the list gives: “"+v+"”.",
+  exact:"Exactly right.", accentTier:"Right — but watch the accents.",
+  artTier:"The word is right — check the article.",
+  artWrong:"The article is wrong — gender counts as grammar.",
+  typoTier:"Nearly — check the spelling.", wrong:"No.",
+  senseTier:"Right meaning — compare your version with the one in the list.",
+  selfOk:"My version counts too", selfDone:"Accepted ✓",
+  phraseNear:"Right meaning — but the exact wording is the one below.",
+  enTypo:"Right — small spelling slip.",
+  altNote:v=>["Your answer “",v,"”"+" is also in your lists with this meaning — both count."],
+  sibNote:"Also in your lists with this meaning: ",
+  sessDone:"Session finished", qs:"questions", right:"correct", prec:"accuracy",
+  toReview:"To review", cont:"Carry on", seeProgress:"See my progress",
+  leechTitle:"Stubborn words", leechCard:n=>`${n} stubborn word${n>1?"s":""} — missed again and again`,
+  leechGo:"Tame them →", leechLabel:"Stubborn",
+  examTab:"Exam", examTitle:"Exam mode",
+  examLede:"Random questions from the units you choose, both directions, no corrections until the end — like a real exam. The result is kept in your code.",
+  examUnits:"Units in the exam", examStart:"Start the exam",
+  examNeedUnits:"Choose at least one unit.",
+  examDone:"Exam finished", examScore:"score", examWrong:"Wrong answers",
+  examGiven:"your answer", examNone:"(blank)", examAgain:"Another exam",
+  taskTitle:"This week's task", taskDone:"done ✓", taskPending:"to do",
+  progressTitle:"Progress",
+  progressLede:"Your progress unit by unit, the lessons that need work, and your code to send to your teacher.",
+  kSeen:"words seen / ", kMast:"mastered (≥ 3 wks)", kDue:"reviews due",
+  kProd:"accuracy, production", kRec:"accuracy, recognition",
+  byUnit:"By unit",
+  thUnit:"Unit", thSeen:"Seen", thMast:"Mastered", thAcc:"Accuracy",
+  weakLessons:"Lessons to shore up",
+  weakEmpty:"Not enough yet — practise a few lessons.",
+  weakLine:(u,n)=>`${u} · Lesson ${n}`,
+  examsHist:"Your exams",
+  sendTitle:"Send to your teacher",
+  sendFormsTxt:"Press “Send via MS Forms”: the form opens with your name and your code already filled in — you just press Submit. The code holds your statistics and the name you typed on Home, nothing else.",
+  sendCopyTxt:"Copy this code and send it to your teacher (email, Teams…). It holds your statistics and the name you typed on Home, nothing else.",
+  sendForms:"Send via MS Forms", copyCode:"Copy the code",
+  sendPasteTxt:"Press “Send via MS Forms”: your code is copied for you and the form opens. Paste the code into the “Code” box, type your name and press Submit.",
+  formsPasteHint:"Code copied. Paste it into the “Code” box on the form.",
+  backup:"Back up (.json)", restore:"Restore a backup", reset:"Reset",
+  resetConfirm:"Erase all your progress on this device? This cannot be undone.",
+  restored:"Backup restored.", badFile:"File not recognised — choose a backup exported from this site.",
+  noName:"(no name)",
+  backupFile:"lexico-progress.json",
+  sessionLabel:(u,n)=>`${u} · Lesson ${n}`, reviewLabel:"Review", examLabel:"Exam"
 };
 /*T-END*/
 
@@ -506,7 +537,7 @@ function gPlural(x){                       /* re-pluralise after flipping */
 function gWordForms(w){                   /* singular or plural */
   const pl = /(es|s)$/.exec(w);
   if(pl && w.length > pl[0].length + 2){
-    /* los trabajadores → las trabajadoras, not «trabajadoraes»: the plural
+    /* los trabajadores → las trabajadoras, not “trabajadoraes”: the plural
        ending is rebuilt from the flipped stem, not carried over. */
     const base = w.slice(0, w.length-pl[0].length), out = new Set();
     gOther(base).forEach(x=>{ if(x!==base) out.add(gPlural(x)); });
@@ -816,6 +847,126 @@ const pad=(function(){
 function showPad(i){ padTarget=i; pad.classList.remove("hidden"); document.body.classList.add("pad-on"); }
 function hidePad(){ padTarget=null; pad.classList.add("hidden"); document.body.classList.remove("pad-on"); }
 
+
+/* ═══════════════════════════════════════════════════════════════════
+   THE REPORT TO THE TEACHER
+   The code was only ever sent when a student remembered to go and look
+   for it in Progreso, which is to say rarely. It now offers itself at
+   the end of every activity, and the strip under the header keeps the
+   state in view. Nothing is ever withheld and nothing is compulsory:
+   the student presses the button, or does not.
+   ═══════════════════════════════════════════════════════════════════ */
+function sentState(){ return S.sent && S.sent.t ? S.sent : null; }
+function unsentCount(){
+  const done = S.sessions.length;
+  const at = sentState() ? (S.sent.s || 0) : 0;
+  return Math.max(0, done - at);
+}
+function agoText(ms){
+  const d = Date.now() - ms;
+  if(d < 90000) return T.agoNow;
+  if(d < 3600000) return T.agoMin(Math.round(d/60000));
+  if(d < DAY) return T.agoHour(Math.round(d/3600000));
+  return T.agoDay(Math.round(d/DAY));
+}
+/* what the code is about to say, in words, so the student knows what travels */
+function sendSummary(){
+  const ids = CORPUS.map(e=>e.id);
+  const seen = ids.filter(isSeen).length, mast = ids.filter(isMastered).length;
+  let a=0,c=0;
+  ids.forEach(id=>["f","r"].forEach(d=>{ const r=recOf(id,d); if(r){ a+=r.seen; c+=r.ok; } }));
+  return {seen:seen, mast:mast, acc:pct(c,a)};
+}
+function markSent(){
+  S.sent = {t:Date.now(), s:S.sessions.length, x:S.exams.length};
+  save();
+  renderSendBar();
+}
+/* One route out, used by the strip, the end-of-activity panel and Progreso,
+   so all three behave the same and all three record the send. */
+async function sendNow(){
+  const code = buildExportCode();
+  if(!CFG.FORMS_URL){
+    try{ await navigator.clipboard.writeText(code); }catch(e){}
+    markSent();
+    return "copied";
+  }
+  if(CFG.FORMS_FIELD_NAME && CFG.FORMS_FIELD_CODE){
+    window.open(CFG.FORMS_URL
+      + "&" + CFG.FORMS_FIELD_NAME + "=" + encodeURIComponent((S.name||"").trim() || T.noName)
+      + "&" + CFG.FORMS_FIELD_CODE + "=" + encodeURIComponent(code), "_blank", "noopener");
+    markSent();
+    return "prefilled";
+  }
+  /* the form's field ids are not configured: copy, then open the empty form */
+  try{ await navigator.clipboard.writeText(code); }
+  catch(e){
+    const ta = el("textarea", {}, code);
+    document.body.append(ta); ta.select();
+    try{ document.execCommand("copy"); }catch(e2){}
+    ta.remove();
+  }
+  alert(T.formsPasteHint);
+  window.open(CFG.FORMS_URL, "_blank", "noopener");
+  markSent();
+  return "paste";
+}
+
+function renderSendBar(){
+  const bar = $("#sendbar");
+  if(!bar) return;
+  const nothingYet = !S.sessions.length && !S.exams.length;
+  if(nothingYet){ bar.className = "sendbar hidden"; bar.innerHTML = ""; return; }
+
+  const st = sentState(), n = unsentCount();
+  let cls = "sendbar", txt;
+  if(!st){ cls += " waiting"; txt = T.barNever + (n ? " " + T.barUnsent(n) : ""); }
+  else if(n){ cls += " waiting"; txt = T.barWaiting(n, agoText(st.t)); }
+  else { cls += " clear"; txt = T.barClear(agoText(st.t)); }
+
+  bar.className = cls;
+  bar.innerHTML = "";
+  const inner = el("div", {class:"sendbar-inner"},
+    el("span", {class:"dot"}),
+    el("span", {class:"txt"}, txt));
+  if(!st || n){
+    const b = el("button", {class:"btn primary", onclick:async()=>{
+      b.disabled = true; b.textContent = T.barSending;
+      await sendNow();
+    }}, T.barSend);
+    inner.append(b);
+  }
+  bar.append(inner);
+}
+
+/* The panel at the end of an activity. It is the whole point of the change:
+   the moment a student has just finished something is the only moment they
+   are certain to be looking at the screen. */
+function sendPanel(){
+  const s = sendSummary();
+  const card = el("div", {class:"card send-card"},
+    el("h3", null, T.sendPanelTitle),
+    el("p", {class:"send-what"}, T.sendPanelWhat(s.seen, s.mast, s.acc)));
+
+  if(!(S.name||"").trim()){
+    const inp = el("input", {class:"typed send-name", value:"", placeholder:T.namePh,
+      oninput:e=>{ S.name = e.target.value.trim(); save(); }});
+    card.append(el("p", {class:"send-what", style:"margin-top:8px"}, T.sendNameHint), inp);
+  }
+
+  const how = (CFG.FORMS_FIELD_NAME && CFG.FORMS_FIELD_CODE) ? T.sendPanelHow : T.sendPanelHowPaste;
+  const note = el("p", {class:"send-what", style:"margin-top:10px"}, how);
+  const b = el("button", {class:"btn primary", onclick:async()=>{
+    b.disabled = true; b.textContent = T.barSending;
+    await sendNow();
+    b.textContent = T.sendPanelDone;
+    note.textContent = T.sendPanelThanks;
+  }}, T.sendPanelGo);
+  card.append(el("div", {class:"btn-row"}, b), note,
+              el("p", {class:"send-what", style:"margin-top:6px"}, T.sendPanelLater));
+  return card;
+}
+
 /* ───────── router ───────── */
 const VIEWS=["accueil","revision","examen","suivi"];
 function go(v){
@@ -828,6 +979,7 @@ function go(v){
   if(v==="revision")renderRevisionConfig();
   if(v==="examen")renderExamConfig();
   if(v==="suivi")renderSuivi();
+  renderSendBar();
   window.scrollTo(0,0);
 }
 VIEWS.forEach(v=>$("#tab-"+v).addEventListener("click",()=>go(v)));
@@ -1178,6 +1330,9 @@ function sessionEnd(v){
     el("h2",null,T.sessDone),
     el("div",{class:"kpi-row"},
       kpi(sess.queue.length,T.qs), kpi(sess.ok,T.right), kpi(pct(sess.ok,sess.queue.length)+" %",T.prec)),
+    /* above the list of words to review, which can run to thirty lines:
+       a panel below that is a panel nobody scrolls to */
+    sendPanel(),
     sess.wrong.length? el("div",{class:"card"},
       el("h3",null,T.toReview),
       el("div",{style:"margin-top:8px"},
@@ -1187,6 +1342,7 @@ function sessionEnd(v){
     el("div",{class:"btn-row"},
       el("button",{class:"btn primary",onclick:sess.back},T.cont),
       el("button",{class:"btn",onclick:()=>go("suivi")},T.seeProgress)));
+  renderSendBar();
 }
 function examEnd(v){
   hidePad(); v.innerHTML="";
@@ -1196,7 +1352,8 @@ function examEnd(v){
   v.append(
     el("h2",null,T.examDone),
     el("div",{class:"kpi-row"},
-      kpi(sess.queue.length,T.qs), kpi(sess.ok,T.right), kpi(p+" %",T.examScore)));
+      kpi(sess.queue.length,T.qs), kpi(sess.ok,T.right), kpi(p+" %",T.examScore)),
+    sendPanel());
   const wrongs=sess.answers.filter(a=>a.q<3);
   if(wrongs.length){
     const card=el("div",{class:"card"},el("h3",null,T.examWrong));
@@ -1211,6 +1368,7 @@ function examEnd(v){
   v.append(el("div",{class:"btn-row"},
     el("button",{class:"btn primary",onclick:renderExamConfig},T.examAgain),
     el("button",{class:"btn",onclick:()=>go("suivi")},T.seeProgress)));
+  renderSendBar();
 }
 
 /* ═════════ SUIVI ═════════ */
@@ -1288,17 +1446,7 @@ function renderSuivi(){
       el("p",{style:"margin:0 0 10px"},CFG.FORMS_URL?((CFG.FORMS_FIELD_NAME&&CFG.FORMS_FIELD_CODE)?T.sendFormsTxt:T.sendPasteTxt):T.sendCopyTxt),
       ta,
       el("div",{class:"btn-row"},
-        CFG.FORMS_URL? el("button",{class:"btn primary",onclick:async()=>{
-          const prefill = CFG.FORMS_FIELD_NAME && CFG.FORMS_FIELD_CODE;
-          if(!prefill){                       // tokens unknown: copy first so one paste finishes it
-            try{ await navigator.clipboard.writeText(code); }catch(e){ ta.select(); document.execCommand("copy"); }
-            alert(T.formsPasteHint);
-            window.open(CFG.FORMS_URL,"_blank","noopener");
-            return;
-          }
-          window.open(CFG.FORMS_URL+"&"+CFG.FORMS_FIELD_NAME+"="+encodeURIComponent(S.name||T.noName)
-                       +"&"+CFG.FORMS_FIELD_CODE+"="+encodeURIComponent(code),"_blank","noopener");
-        }},T.sendForms):null,
+        CFG.FORMS_URL? el("button",{class:"btn primary",onclick:sendNow},T.sendForms):null,
         el("button",{class:"btn"+(CFG.FORMS_URL?" ghost":" primary"),onclick:async()=>{try{await navigator.clipboard.writeText(code)}catch(e){ta.select();document.execCommand("copy")}}},T.copyCode),
         el("button",{class:"btn ghost",onclick:downloadBackup},T.backup),
         el("button",{class:"btn ghost",onclick:restoreBackup},T.restore),
@@ -1404,4 +1552,5 @@ function deepLink(){
 window.addEventListener("hashchange", function(){ deepLink() || go("accueil"); });
 
 if(!deepLink()) go("accueil");
+renderSendBar();
 })();

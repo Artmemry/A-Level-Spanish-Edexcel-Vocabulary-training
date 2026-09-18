@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>El Léxico · A-Level Spanish BBA</title>
-<meta name="description" content="Vocabulario A-Level Spanish (Edexcel 9SP0): listas del cuaderno, respuestas escritas en los dos sentidos, seguimiento del progreso.">
+<meta name="description" content="A-Level Spanish vocabulary (Edexcel 9SP0): the lists from your exercise book, written answers in both directions, progress you can send to your teacher.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -17,14 +17,16 @@
       <div class="brand">el léxico<sup>1</sup></div>
       <div class="brand-sub">A-Level Spanish · Edexcel 9SP0 · BBA Sixth Form</div>
     </div>
-    <nav class="tabs" aria-label="Navegación principal">
-      <button id="tab-accueil" aria-selected="true">Inicio</button>
-      <button id="tab-revision" aria-selected="false">Repaso</button>
-      <button id="tab-examen" aria-selected="false">Examen</button>
-      <button id="tab-suivi" aria-selected="false">Progreso</button>
+    <nav class="tabs" aria-label="Main navigation">
+      <button id="tab-accueil" aria-selected="true">Home</button>
+      <button id="tab-revision" aria-selected="false">Review</button>
+      <button id="tab-examen" aria-selected="false">Exam</button>
+      <button id="tab-suivi" aria-selected="false">Progress</button>
     </nav>
   </div>
 </header>
+
+<div id="sendbar" class="sendbar hidden" role="status"></div>
 
 <main>
   <section id="view-accueil"></section>
@@ -34,8 +36,8 @@
 </main>
 
 <footer class="site">
-  el léxico¹ — s.m. 1. conjunto de las palabras de una lengua. 2. tu herramienta de repaso.
-  · Progreso guardado localmente en este dispositivo.
+  el léxico¹ — n.m. 1. the whole set of words in a language. 2. your revision tool.
+  · Progress is saved on this device.
 </footer>
 
 <script src="data/corpus.js"></script>
