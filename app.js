@@ -126,6 +126,8 @@ const T={
   examDone:"Examen terminado", examScore:"nota", examWrong:"Respuestas incorrectas",
   examGiven:"tu respuesta", examNone:"(en blanco)", examAgain:"Otro examen",
   taskTitle:"Tarea de la semana", taskDone:"hecha ✓", taskPending:"pendiente",
+  taskFor:d=>"For "+d, taskWasDue:d=>"Was due "+d, taskCount:(n,m)=>n+" of "+m+" done",
+  taskAllDone:"Task of the week done ✓", taskGo:"Ver la tarea", taskStrip:l=>"This week: "+l,
   progressTitle:"Progreso",
   progressLede:"Your progress unit by unit, the lessons that need work, and your code to send to your teacher.",
   kSeen:"palabras vistas / ", kMast:"dominadas (≥ 3 sem.)", kDue:"repasos pendientes",
@@ -925,6 +927,7 @@ async function sendNow(extra){
 }
 
 function renderSendBar(){
+  renderTaskBar();
   const bar = $("#sendbar");
   if(!bar) return;
   const nothingYet = !S.sessions.length && !S.exams.length;
@@ -1013,7 +1016,30 @@ function assignment(){
   if(!a||!a.label||!Array.isArray(a.lessons)||!a.lessons.length) return null;
   const since=Date.parse(a.since||"2000-01-01");
   const done=a.lessons.map(lid=>S.sessions.some(s=>s.lid===lid&&s.t>=since));
-  return {...a, since, done};
+  const due=a.due ? new Date(a.due+"T23:59:59") : null;
+  return {...a, since, done, due:(due&&!isNaN(due))?due:null,
+          nDone:done.filter(Boolean).length, all:done.every(Boolean)};
+}
+function dueText(a){
+  if(!a.due) return "";
+  const d=a.due.toLocaleDateString("en-GB",{weekday:"long",day:"numeric",month:"long"});
+  return Date.now()>a.due.getTime() && !a.all ? T.taskWasDue(d) : T.taskFor(d);
+}
+/* The task strip: under the send strip, on every tab, so what is set is never
+   more than a glance away. Blue while there is something to do, green once
+   the whole task is done, absent when no task is set. */
+function renderTaskBar(){
+  const bar=$("#taskbar"); if(!bar) return;
+  const a=assignment();
+  if(!a){ bar.className="sendbar hidden"; bar.innerHTML=""; return; }
+  bar.className="sendbar task"+(a.all?" clear":"");
+  bar.innerHTML="";
+  const txt=a.all ? T.taskAllDone+" — "+a.label
+                  : T.taskStrip(a.label)+" · "+T.taskCount(a.nDone,a.lessons.length)+(a.due?" · "+dueText(a):"");
+  const inner=el("div",{class:"sendbar-inner"},el("span",{class:"dot"}),el("span",{class:"txt"},txt));
+  if(!a.all) inner.append(el("button",{class:"btn primary",onclick:()=>{go("accueil");
+    const c=$("#taskCard"); if(c&&c.scrollIntoView) try{c.scrollIntoView({block:"start"});}catch(e){} }},T.taskGo));
+  bar.append(inner);
 }
 
 /* ═════════ ACCUEIL ═════════ */
@@ -1025,15 +1051,12 @@ function renderAccueil(){
   const a=assignment();
   v.append(
     el("h2",null,T.homeTitle),
-    el("p",{class:"lede"},T.homeLede),
-    el("div",{class:"card"},
-      el("label",{for:"student-name",style:"font-weight:600;font-size:.9rem"},T.nameLabel),
-      el("input",{id:"student-name",class:"typed",style:"margin-top:8px",value:S.name||"",placeholder:T.namePh,
-        oninput:e=>{S.name=e.target.value.trim();save()}}),
-      el("div",{class:"btn-row"},audioToggle()), voicePicker()));
+    el("p",{class:"lede"},T.homeLede));
   if(a){
-    const card=el("div",{class:"card",style:"margin-top:14px;border-color:var(--bleu)"},
-      el("h3",null,T.taskTitle+" — "+a.label));
+    const card=el("div",{class:"card",id:"taskCard",style:"margin-top:14px;border-color:var(--bleu);border-width:2px"},
+      el("h3",null,T.taskTitle+" — "+a.label),
+      el("p",{class:"lede",style:"margin:2px 0 6px;font-size:.9rem"},
+        T.taskCount(a.nDone,a.lessons.length)+(a.due?" · "+dueText(a):"")));
     a.lessons.forEach((lid,i)=>{
       const [uid]=lid.split(".");
       const L=UNITS[uid]&&UNITS[uid].lessons[lid];
@@ -1045,6 +1068,12 @@ function renderAccueil(){
     });
     v.append(card);
   }
+  v.append(
+    el("div",{class:"card"},
+      el("label",{for:"student-name",style:"font-weight:600;font-size:.9rem"},T.nameLabel),
+      el("input",{id:"student-name",class:"typed",style:"margin-top:8px",value:S.name||"",placeholder:T.namePh,
+        oninput:e=>{S.name=e.target.value.trim();save()}}),
+      el("div",{class:"btn-row"},audioToggle()), voicePicker()));
   if(dueN) v.append(el("div",{class:"card",style:"margin-top:14px;border-color:var(--rouge)"},
     el("h3",null,T.dueCard(dueN)),
     el("div",{class:"btn-row"},el("button",{class:"btn primary",onclick:()=>go("revision")},T.startReview))));
