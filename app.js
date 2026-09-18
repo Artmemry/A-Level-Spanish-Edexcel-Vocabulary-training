@@ -23,14 +23,14 @@ const CFG={
      token of the NAME question below, and the token of the CODE question into
      FORMS_FIELD_CODE. While either is empty the student is asked to paste instead,
      which still works but costs them a step. */
-  FORMS_FIELD_NAME:"",   // empty = code is copied and pasted by hand
+  FORMS_FIELD_NAME:"r08cab71007074f60a012ed77717b62d2",   // empty = code is copied and pasted by hand
   /* Optional. Paste the URL of a Power Automate "When an HTTP request is received"
      flow here and a signalled answer is posted to it silently. Empty = nothing is sent. */
   ALERT_URL:"",
   /* Optional. The field id of one extra question on the Forms form, which then
      carries the report in words instead of inside the code. */
   FORMS_FIELD_FLAG:"r93f547c6c0984f949ff3e2c266090969",
-  FORMS_FIELD_CODE:""
+  FORMS_FIELD_CODE:"rbd3a09625c5c42399a03efd42ac1d5fa"
 };
 /*CFG-END*/
 
