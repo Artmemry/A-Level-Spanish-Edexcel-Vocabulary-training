@@ -127,7 +127,7 @@ const T={
   examGiven:"tu respuesta", examNone:"(en blanco)", examAgain:"Otro examen",
   taskTitle:"Tarea de la semana", taskDone:"hecha ✓", taskPending:"pendiente",
   taskFor:d=>"For "+d, taskWasDue:d=>"Was due "+d, taskCount:(n,m)=>n+" of "+m+" done",
-  taskAllDone:"Task of the week done ✓", taskGo:"Ver la tarea", taskStrip:l=>"This week: "+l,
+  taskAllDone:"Task of the week done ✓", clsLabel:"Clase", clsHint:"Optional. Your teacher's task link sets it for you; change it here if it is wrong.", clsAsk:"Which class are you in?", taskGo:"Ver la tarea", taskStrip:l=>"This week: "+l,
   progressTitle:"Progreso",
   progressLede:"Your progress unit by unit, the lessons that need work, and your code to send to your teacher.",
   kSeen:"palabras vistas / ", kMast:"dominadas (≥ 3 sem.)", kDue:"repasos pendientes",
@@ -1011,8 +1011,69 @@ function pills(items,current,on){
 }
 
 /* ───────── assignment ───────── */
+/* A task can also arrive inside the link the teacher posts — ?task=… — built
+   on the dashboard with no file to edit. It is kept on this device and shown
+   from then on; a newer one replaces it; ?task=none removes it. When both a
+   linked task and assignments.js exist, the more recent one wins. */
+const TASK_KEY=CFG.ls+":task";
+function decodeTask(str){
+  try{
+    let b=String(str||"").replace(/-/g,"+").replace(/_/g,"/");
+    while(b.length%4) b+="=";
+    const o=JSON.parse(decodeURIComponent(escape(atob(b))));
+    return (o&&typeof o==="object")?o:null;
+  }catch(e){ return null; }
+}
+const CLASSES=["Y12","Y13"];
+function taskStore(){
+  try{ let o=JSON.parse(localStorage.getItem(TASK_KEY)||"{}"); if(o&&o.label) o={all:o}; return o||{}; }catch(e){ return {}; }
+}
+function saveTaskStore(o){ try{ localStorage.setItem(TASK_KEY,JSON.stringify(o)); }catch(e){} }
+(function(){
+  const m=/[?&]task=([^&#]+)/.exec(location.search||"");
+  if(!m) return;
+  const v=decodeURIComponent(m[1]);
+  try{
+    if(/^(none|clear|off)$/i.test(v)) localStorage.removeItem(TASK_KEY);
+    else { const o=decodeTask(v); if(o&&o.label){ o.t=o.t||Date.now();
+      const st=taskStore(); st[o.cls||"all"]=o; saveTaskStore(st);
+      if(o.cls&&!S.cls){ S.cls=o.cls; save(); } } }
+  }catch(e){}
+  /* keep any ?l= deep link the same address may carry */
+  try{
+    const rest=(location.search||"").replace(/[?&]task=[^&#]*/,"").replace(/^&/,"?");
+    history.replaceState(null,"",location.pathname+(rest.length>1?rest:"")+location.hash);
+  }catch(e){}
+})();
+function fileTaskFor(cls){
+  const a=window.ASSIGNMENT; if(!a) return null;
+  if(a.label) return (!a.cls||!cls||a.cls===cls)?a:null;
+  return (cls&&a[cls]&&a[cls].label)?a[cls]:null;
+}
+function fileHasClasses(){ const a=window.ASSIGNMENT; return !!(a&&!a.label&&CLASSES.some(c=>a[c]&&a[c].label)); }
+function needsClass(){
+  if(S.cls) return false;
+  const st=taskStore();
+  return fileHasClasses()||CLASSES.some(c=>st[c]&&st[c].label);
+}
+function setClass(c){ S.cls=c||""; save(); renderAccueil(); renderSendBar(); }
+function classButtons(){
+  return el("div",{class:"btn-row",style:"margin-top:6px"},
+    ...CLASSES.map(c=>el("button",{class:"btn small"+(S.cls===c?" primary":" ghost"),onclick:()=>setClass(S.cls===c?"":c)},c)));
+}
+function currentTask(){
+  const st=taskStore();
+  const linked=(S.cls&&st[S.cls])||st.all||null;
+  const file=fileTaskFor(S.cls);
+  if(linked&&linked.label){
+    if(!file) return linked;
+    const ft=Date.parse(file.since||"2000-01-01")||0;
+    return (linked.t||0)>=ft?linked:file;
+  }
+  return file;
+}
 function assignment(){
-  const a=window.ASSIGNMENT;
+  const a=currentTask();
   if(!a||!a.label||!Array.isArray(a.lessons)||!a.lessons.length) return null;
   const since=Date.parse(a.since||"2000-01-01");
   const done=a.lessons.map(lid=>S.sessions.some(s=>s.lid===lid&&s.t>=since));
@@ -1031,6 +1092,12 @@ function dueText(a){
 function renderTaskBar(){
   const bar=$("#taskbar"); if(!bar) return;
   const a=assignment();
+  if(!a&&needsClass()){
+    bar.className="sendbar task"; bar.innerHTML="";
+    const inner=el("div",{class:"sendbar-inner"},el("span",{class:"dot"}),el("span",{class:"txt"},T.clsAsk));
+    CLASSES.forEach(c=>inner.append(el("button",{class:"btn primary",onclick:()=>setClass(c)},c)));
+    bar.append(inner); return;
+  }
   if(!a){ bar.className="sendbar hidden"; bar.innerHTML=""; return; }
   bar.className="sendbar task"+(a.all?" clear":"");
   bar.innerHTML="";
@@ -1052,9 +1119,15 @@ function renderAccueil(){
   v.append(
     el("h2",null,T.homeTitle),
     el("p",{class:"lede"},T.homeLede));
+  if(!a&&needsClass()){
+    v.append(el("div",{class:"card",id:"taskCard",style:"margin-top:14px;border:2px dashed var(--bleu)"},
+      el("h3",null,T.taskTitle),
+      el("p",{class:"lede",style:"margin:2px 0 6px;font-size:.9rem"},T.clsAsk),
+      el("div",{class:"btn-row"},...CLASSES.map(c=>el("button",{class:"btn primary",onclick:()=>setClass(c)},c)))));
+  }
   if(a){
     const card=el("div",{class:"card",id:"taskCard",style:"margin-top:14px;border-color:var(--bleu);border-width:2px"},
-      el("h3",null,T.taskTitle+" — "+a.label),
+      el("h3",null,T.taskTitle+" — "+a.label+(S.cls?" · "+S.cls:"")),
       el("p",{class:"lede",style:"margin:2px 0 6px;font-size:.9rem"},
         T.taskCount(a.nDone,a.lessons.length)+(a.due?" · "+dueText(a):"")));
     a.lessons.forEach((lid,i)=>{
@@ -1073,6 +1146,9 @@ function renderAccueil(){
       el("label",{for:"student-name",style:"font-weight:600;font-size:.9rem"},T.nameLabel),
       el("input",{id:"student-name",class:"typed",style:"margin-top:8px",value:S.name||"",placeholder:T.namePh,
         oninput:e=>{S.name=e.target.value.trim();save()}}),
+      el("label",{style:"font-weight:600;font-size:.9rem;display:block;margin-top:14px"},T.clsLabel),
+      el("p",{class:"lede",style:"font-size:.82rem;margin:2px 0 0"},T.clsHint),
+      classButtons(),
       el("div",{class:"btn-row"},audioToggle()), voicePicker()));
   if(dueN) v.append(el("div",{class:"card",style:"margin-top:14px;border-color:var(--rouge)"},
     el("h3",null,T.dueCard(dueN)),
@@ -1511,7 +1587,7 @@ function buildExportCode(){
   const a2=assignment();
   /* answers the student claimed were also right — the teacher decides */
   const cl=(S.claims||[]).slice(-25).map(c=>[c.id,c.a,c.g]);
-  const payload={v:2,n:S.name||T.noName,t:Date.now(),
+  const payload={v:2,n:S.name||T.noName,t:Date.now(),k:S.cls||"",
     c:cl,
     o:{seen:CORPUS.map(e=>e.id).filter(isSeen).length,total:CORPUS.length,
        mast:CORPUS.map(e=>e.id).filter(isMastered).length,sess:S.sessions.length,lee:leeches().length},

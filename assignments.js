@@ -7,4 +7,11 @@
 //
 // A lesson counts as done once the student has played it through since `since`.
 // Leave label:"" to show no task. Nothing here ever blocks a student.
+//
+// One task for everyone, as above — or one per class (a student who has not
+// yet said which class is asked once):
+//   window.ASSIGNMENT = { Y12:{ label:"…", lessons:[…], since:"…", due:"…" },
+//                         Y13:{ label:"…", lessons:[…], since:"…", due:"…" } };
+// Usually you will not touch this file at all: the teacher dashboard builds a
+// link that carries the task, and that link is what you post to the class.
 window.ASSIGNMENT = { label:"", lessons:[], since:"", due:"" };

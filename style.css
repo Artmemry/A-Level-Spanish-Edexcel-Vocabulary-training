@@ -283,3 +283,9 @@ button.speak:hover{border-color:var(--bleu); background:var(--bleu-pale)}
   table.stats td{border-bottom:1px solid #999}
   h2{font-size:1.2rem}
 }
+
+/* ── the task strip: what is set this week, on every tab ── */
+.sendbar.task{background:var(--bleu-pale); border-bottom-color:#C9D3EA}
+.sendbar.task .dot{background:var(--bleu)}
+.sendbar.task.clear{background:var(--vert-pale); border-bottom-color:#BFD9CB}
+.sendbar.task.clear .dot{background:var(--vert)}
