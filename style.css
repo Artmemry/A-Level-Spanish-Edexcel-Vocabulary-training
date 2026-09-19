@@ -289,3 +289,7 @@ button.speak:hover{border-color:var(--bleu); background:var(--bleu-pale)}
 .sendbar.task .dot{background:var(--bleu)}
 .sendbar.task.clear{background:var(--vert-pale); border-bottom-color:#BFD9CB}
 .sendbar.task.clear .dot{background:var(--vert)}
+
+/* the discreet way in for teachers, at the foot of every page */
+footer.site a.teacher-link{color:var(--muted);text-decoration:none;border-bottom:1px dotted var(--line-strong)}
+footer.site a.teacher-link:hover{color:var(--ink)}
