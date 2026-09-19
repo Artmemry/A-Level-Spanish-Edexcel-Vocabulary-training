@@ -1025,6 +1025,11 @@ function decodeTask(str){
   }catch(e){ return null; }
 }
 const CLASSES=["Y12","Y13"];
+/* The class is the teaching group as the register writes it — 12Veil, 13Duque.
+   Its leading number is the year, so a group still lights the right year
+   button, and an older "Y12" code keeps working unchanged. */
+function yearOf(c){ const m = /^Y?(\d{1,2})/.exec(String(c||"").trim()); return m ? "Y"+m[1] : ""; }
+
 function taskStore(){
   try{ let o=JSON.parse(localStorage.getItem(TASK_KEY)||"{}"); if(o&&o.label) o={all:o}; return o||{}; }catch(e){ return {}; }
 }
@@ -1059,7 +1064,9 @@ function needsClass(){
 function setClass(c){ S.cls=c||""; save(); renderAccueil(); renderSendBar(); }
 function classButtons(){
   return el("div",{class:"btn-row",style:"margin-top:6px"},
-    ...CLASSES.map(c=>el("button",{class:"btn small"+(S.cls===c?" primary":" ghost"),onclick:()=>setClass(S.cls===c?"":c)},c)));
+    ...CLASSES.map(c=>el("button",{class:"btn small"+(yearOf(S.cls)===c?" primary":" ghost"),onclick:()=>setClass(yearOf(S.cls)===c?"":c)},c)),
+    ...(S.cls && CLASSES.indexOf(S.cls)<0
+        ? [el("span",{style:"align-self:center;margin-left:8px;color:var(--ink-soft);font-size:.85rem"},S.cls)] : []));
 }
 function currentTask(){
   const st=taskStore();
