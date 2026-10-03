@@ -1148,6 +1148,13 @@ function renderAccueil(){
         el("span",{class:"session-count",style:a.done[i]?"color:var(--vert)":"color:var(--rouge)"},a.done[i]?T.taskDone:T.taskPending),
         el("button",{class:"btn small primary",onclick:()=>startLesson(uid,lid)},T.practise)));
     });
+    /* a two-site task: the rest of it is on the A-Level site, one click away */
+    if(Array.isArray(a.items)&&a.items.length&&window.BBA_SEQ&&window.BBA_SEQ.active()){
+      const n=a.items.length;
+      card.append(el("div",{style:"display:flex;gap:10px;align-items:center;padding:10px 0 2px;margin-top:6px;border-top:1px solid var(--line)"},
+        el("span",{style:"flex:1;font-weight:600"},"Then "+n+(n>1?" activities":" activity")+" on the A-Level site"),
+        el("button",{class:"btn small",onclick:()=>window.BBA_SEQ.go(a.lessons.length)},window.BBA_SEQ.there)));
+    }
     v.append(card);
   }
   v.append(
