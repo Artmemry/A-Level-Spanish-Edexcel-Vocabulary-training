@@ -1099,6 +1099,8 @@ function dueText(a){
 function renderTaskBar(){
   const bar=$("#taskbar"); if(!bar) return;
   const a=assignment();
+  /* tell the sequence strip (bba-sequence.js) which lists are done */
+  if(a&&window.BBA_SEQ) a.lessons.forEach((lid,i)=>window.BBA_SEQ.mark("lex",lid,a.done[i]));
   if(!a&&needsClass()){
     bar.className="sendbar task"; bar.innerHTML="";
     const inner=el("div",{class:"sendbar-inner"},el("span",{class:"dot"}),el("span",{class:"txt"},T.clsAsk));
