@@ -1121,6 +1121,7 @@ function renderTaskBar(){
 /* ═════════ ACCUEIL ═════════ */
 let openUnit=null;
 function renderAccueil(){
+  hidePad();          /* leaving a session by "Quitter" must not leave the keypad behind */
   const v=$("#view-accueil"); v.innerHTML="";
   const dueN=CORPUS.reduce((n,e)=>n+dueDirs(e.id).length,0);
   const lee=leeches();
