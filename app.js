@@ -189,9 +189,32 @@ CORPUS.forEach(e=>{
    rec key = `${id}|f` production (EN → target)  ·  `${id}|r` recognition (target → EN) */
 function rk(id,dir){ return id+"|"+(dir==="fren"?"r":"f"); }  // dict & enfr grade production
 function srsGet(k){ return S.srs[k]||(S.srs[k]={ef:2.5,int:0,reps:0,due:0,seen:0,ok:0,lapses:0}); }
+/* QUESTIONS ANSWERED — the department's first measure. Every graded answer
+   is tallied per day and per list, so "since the task was set" can be counted
+   exactly; the all-time count is the per-card total kept by the SRS records.
+   S.ans = {day:{lid:n}}; S.ansFrom marks when the tally began, so earlier
+   days fall back to the session history. */
+function logAns(id,delta){
+  try{
+    const e=byId[id]; if(!e) return;
+    S.ans=S.ans||{}; if(!S.ansFrom) S.ansFrom=Date.now();
+    const d=String(Math.floor(Date.now()/DAY)), L=e.lesson||"?";
+    const day=S.ans[d]||(S.ans[d]={}); day[L]=Math.max(0,(day[L]||0)+delta);
+    const keys=Object.keys(S.ans); if(keys.length>420) keys.sort((a,b)=>a-b).slice(0,keys.length-420).forEach(k=>delete S.ans[k]);
+  }catch(err){}
+}
+function ansSince(since){                         /* {lid:n} answered since a date (ms) */
+  const out={}; if(!since) return out;
+  const d0=Math.floor(since/DAY);
+  Object.keys(S.ans||{}).forEach(d=>{ if(+d<d0) return; const day=S.ans[d]; Object.keys(day).forEach(L=>out[L]=(out[L]||0)+day[L]); });
+  const from=S.ansFrom||Date.now();               /* before the tally existed: the lesson sessions */
+  (S.sessions||[]).forEach(x=>{ if(x.t>=since && x.t<from && x.lid && x.lid!=="exam") out[x.lid]=(out[x.lid]||0)+(x.n||0); });
+  return out;
+}
 function srsGrade(id,dir,q){
   const r=srsGet(rk(id,dir));
   r.seen++; if(q>=3)r.ok++;
+  logAns(id,1);
   if(q<3){ r.reps=0; r.int=0; r.lapses++; r.due=Date.now(); }
   else{ r.reps++;
     if(r.reps===1)r.int=1; else if(r.reps===2)r.int=6; else r.int=Math.round(r.int*r.ef);
@@ -1373,7 +1396,7 @@ function renderQ(){
     if(res.q<4){
       const sg=el("button",{class:"btn small ghost",style:"margin-top:10px",onclick:()=>{
         const r=srsGet(rk(e.id, dict?"enfr":dir));
-        r.seen--; if(res.q>=3)r.ok--;                 // undo the automatic mark
+        r.seen--; if(res.q>=3)r.ok--; logAns(e.id,-1);                 // undo the automatic mark
         srsGrade(e.id, dict?"enfr":dir, 4);
         if(res.q<3){ sess.ok++; const i=sess.wrong.lastIndexOf(e.id); if(i>=0)sess.wrong.splice(i,1); }
         S.claims = S.claims || [];
@@ -1591,14 +1614,15 @@ function buildExportCode(){
     const ids=UNITS[uid].ids, s=ids.filter(isSeen);
     if(!s.length)return;
     let a=0,c=0; ids.forEach(id=>["f","r"].forEach(d=>{const r=recOf(id,d);if(r){a+=r.seen;c+=r.ok}}));
-    u[uid]=[s.length,ids.length,ids.filter(isMastered).length,pct(c,a)];
+    u[uid]=[s.length,ids.length,ids.filter(isMastered).length,pct(c,a),a];   /* …, answered (all time) */
   });
   let l=[];
+  const _a2=assignment(); const TS=_a2?ansSince(_a2.since):null;
   UNIT_ORDER.forEach(uid=>UNITS[uid].lessonOrder.forEach(lid=>{
     const ids=UNITS[uid].lessons[lid].ids;
     const s=ids.filter(isSeen); if(!s.length)return;
     let a=0,c=0; ids.forEach(id=>["f","r"].forEach(d=>{const r=recOf(id,d);if(r){a+=r.seen;c+=r.ok}}));
-    l.push([lid,s.length,ids.length,pct(c,a)]);
+    l.push([lid,s.length,ids.length,pct(c,a),a,ids.filter(isMastered).length,TS?(TS[lid]||0):null]);   /* …, answered all time, mastered, answered since the task */
   }));
   const x=S.exams.slice(-5).map(e2=>[Math.round(e2.t/DAY),e2.pct,e2.n]);
   const a2=assignment();
@@ -1607,7 +1631,9 @@ function buildExportCode(){
   const payload={v:2,n:S.name||T.noName,t:Date.now(),k:S.cls||"",
     c:cl,
     o:{seen:CORPUS.map(e=>e.id).filter(isSeen).length,total:CORPUS.length,
-       mast:CORPUS.map(e=>e.id).filter(isMastered).length,sess:S.sessions.length,lee:leeches().length},
+       mast:CORPUS.map(e=>e.id).filter(isMastered).length,sess:S.sessions.length,lee:leeches().length,
+       ans:Object.keys(S.srs).reduce((n,k)=>n+(S.srs[k].seen||0),0),
+       ansT:TS?Object.keys(TS).reduce((n,k)=>n+TS[k],0):null, ts:_a2?Math.floor(_a2.since/DAY):null},
     u,l,x, a:a2?{lab:a2.label,done:a2.done}:null};
   let code=CFG.prefix+btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
   if(code.length>3800){ // MS Forms long-answer safety: keep weakest 30 lessons
