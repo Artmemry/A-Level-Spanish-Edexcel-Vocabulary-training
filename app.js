@@ -1106,7 +1106,9 @@ function assignment(){
   const a=currentTask();
   if(!a||!a.label||!Array.isArray(a.lessons)||!a.lessons.length) return null;
   const since=Date.parse(a.since||"2000-01-01");
-  const done=a.lessons.map(lid=>S.sessions.some(s=>s.lid===lid&&s.t>=since));
+  /* a list is done once 95 % of its words have been written correctly (English → target
+     language) since the task was set; reading alone never completes it */
+  const done=a.lessons.map(lid=>writtenNeed(lid,since)===0);
   const due=a.due ? new Date(a.due+"T23:59:59") : null;
   return {...a, since, done, due:(due&&!isNaN(due))?due:null,
           nDone:done.filter(Boolean).length, all:done.every(Boolean)};
@@ -1169,7 +1171,7 @@ function renderAccueil(){
       if(!L)return;
       card.append(el("div",{style:"display:flex;gap:10px;align-items:center;padding:4px 0"},
         el("span",{style:"flex:1"},T.lessonLine(lid.split(".")[1],L.title,L.ids.length)),
-        el("span",{class:"session-count",style:a.done[i]?"color:var(--vert)":"color:var(--rouge)"},a.done[i]?T.taskDone:T.taskPending),
+        el("span",{class:"session-count",style:a.done[i]?"color:var(--vert)":"color:var(--rouge)"},a.done[i]?T.taskDone:(writtenNeed(lid,a.since)+" more to write")),
         el("button",{class:"btn small primary",onclick:()=>startLesson(uid,lid)},T.practise)));
     });
     /* a two-site task: the rest of it is on the A-Level site, one click away */
@@ -1256,7 +1258,86 @@ function renderListe(uid,lid){
 
 /* ═════════ SESSIONS ═════════ */
 let sess=null, lessonPrefs={dir:"mixte"}, revLen=20;
+/* ═══════════════════════════════════════════════════════════════════
+   HOMEWORK MODE — every list set as homework runs the same way, word by word:
+     reading (target language → English): until the student recognises the
+       word — then that word moves on to writing, later in the same session;
+     writing (English → target language): compulsory, and what counts the list
+       as done (95 % of its words written correctly since the task was set);
+     dictation: only if the teacher added it when setting the task.
+   The teacher can also switch reading off, for a group that should go straight
+   to writing. Nobody is ever stuck: a word missed three times in reading
+   moves on to writing anyway. Free practice keeps the choice of direction.
+   ═══════════════════════════════════════════════════════════════════ */
+const PH = /^es/.test(CFG.ttsLang||"") ? {read:"Leer", write:"Escribir", dict:"Dictado", go:"Empezar", lang:"Spanish"}
+                                       : {read:"Lire", write:"Écrire", dict:"Dictée", go:"Commencer", lang:"French"};
+const DONE_SHARE = 0.95;
+function markWritten(id){ S.wr = S.wr || {}; S.wr[id] = Date.now(); }
+/* how many more words of a list must be written correctly to reach 95 % */
+function writtenNeed(lid, since){
+  const [uid] = lid.split("."), L = UNITS[uid] && UNITS[uid].lessons[lid];
+  if(!L) return 0;
+  const n = L.ids.length, w = L.ids.filter(id => (S.wr||{})[id] >= since).length;
+  return Math.max(0, Math.ceil(DONE_SHARE*n) - w);
+}
+function taskModeFor(lid){
+  const a = typeof currentTask === "function" ? currentTask() : null;
+  if(!a || !Array.isArray(a.lessons) || a.lessons.indexOf(lid) < 0) return null;
+  const m = a.m || {};
+  return {read: m.r !== 0, dict: !!m.d && ttsOK};
+}
+function startTaskLesson(uid, lid, mode){
+  go("accueil");
+  const v=$("#view-accueil"); v.innerHTML="";
+  const L=UNITS[uid].lessons[lid];
+  const steps=[mode.read ? [PH.read, "read each word and type the English. Once you know a word, it moves on to writing."] : null,
+               [PH.write, "type the "+PH.lang+" for each word. This is what counts: the list is done when 95 % of its words are written correctly."],
+               mode.dict ? [PH.dict, "listen and type what you hear, once you have written the word."] : null].filter(Boolean);
+  v.append(
+    el("div",{class:"session-bar"},el("button",{class:"btn small ghost",onclick:renderAccueil},T.back)),
+    el("h2",null,T.lessonLine(lid.split(".")[1],L.title,L.ids.length)),
+    el("div",{class:"card"},
+      ...steps.map((x,i)=>el("p",{style:"margin:4px 0"},el("b",null,(i+1)+" · "+x[0])," — "+x[1])),
+      el("div",{class:"btn-row"},
+        el("button",{class:"btn primary",onclick:()=>{
+          const ids=shuffle(L.ids), first=mode.read?"fren":"enfr";
+          sess={queue:ids.map(id=>({id,dir:first})),i:0,ok:0,wrong:[],back:renderAccueil,
+                label:T.sessionLabel(uid,lid.split(".")[1]),view:"#view-accueil",lid,silent:false,
+                flow:{dict:mode.dict, n:ids.length, tries:{}, written:new Set()}};
+          renderQ();
+        }},PH.go))));
+}
+/* after each answer in homework mode: where does this word go next? */
+function flowSchedule(id, dir, gap){
+  const pos = Math.min(sess.queue.length, sess.i + 1 + gap);
+  sess.queue.splice(pos, 0, {id, dir});
+}
+function flowNext(id, dir, q){
+  const F = sess.flow; if(!F) return;
+  const k = id + "|" + dir, t = F.tries[k] = (F.tries[k]||0) + 1;
+  if(dir === "fren"){
+    if(q >= 3 || t >= 3) flowSchedule(id, "enfr", 3);      /* recognised (or tried three times): now write it */
+    else flowSchedule(id, "fren", 4);                       /* not yet: it comes back in reading */
+  } else if(dir === "enfr"){
+    if(q >= 3){ F.written.add(id); if(F.dict) flowSchedule(id, "dict", 3); }
+    else if(t < 2) flowSchedule(id, "enfr", 4);             /* one more go at writing it later */
+  }
+}
+/* "my version counts too" turns a wrong answer right: move its retry on a stage */
+function flowUpgrade(id, dir){
+  const F = sess.flow; if(!F) return;
+  for(let j = sess.i + 1; j < sess.queue.length; j++){
+    const x = sess.queue[j];
+    if(x.id !== id || x.dir !== dir) continue;
+    if(dir === "fren") x.dir = "enfr";
+    else if(dir === "enfr"){ F.written.add(id); if(F.dict) x.dir = "dict"; else sess.queue.splice(j, 1); }
+    return;
+  }
+  if(dir === "enfr") F.written.add(id);
+}
 function startLesson(uid,lid){
+  const tm=taskModeFor(lid);
+  if(tm) return startTaskLesson(uid,lid,tm);
   go("accueil");
   const v=$("#view-accueil"); v.innerHTML="";
   const u=UNITS[uid], L=u.lessons[lid];
@@ -1331,11 +1412,13 @@ function renderQ(){
   hidePad();
   if(sess.i>=sess.queue.length)return sess.silent?examEnd(v):sessionEnd(v);
   v.innerHTML="";
-  const p=pct(sess.i,sess.queue.length);
+  const F=sess.flow, cur=sess.queue[sess.i];
+  const p=F ? pct(F.written.size, F.n) : pct(sess.i,sess.queue.length);
   v.append(el("div",{class:"session-bar"},
     el("button",{class:"btn small ghost",onclick:sess.back},T.quit),
     el("div",{class:"progress"},el("i",{style:"width:"+p+"%"})),
-    el("span",{class:"session-count"},`${sess.i+1} / ${sess.queue.length}`),
+    F ? el("span",{class:"session-count",style:"font-weight:700"},cur.dir==="fren"?PH.read:cur.dir==="dict"?PH.dict:PH.write) : null,
+    F ? el("span",{class:"session-count"},PH.write+" ✓ "+F.written.size) : el("span",{class:"session-count"},`${sess.i+1} / ${sess.queue.length}`),
     sess.silent?null:el("span",{class:"score-pill"},`✓ ${sess.ok}`),
     audioToggle()));
   const {id,dir}=sess.queue[sess.i], e=byId[id];
@@ -1371,6 +1454,8 @@ function renderQ(){
     const q=res?res.q:1;
     srsGrade(e.id, dict?"enfr":dir, q);
     if(q>=3)sess.ok++; else sess.wrong.push(e.id);
+    if(dir==="enfr" && q>=3) markWritten(e.id);          /* writing correct: counts towards the list */
+    if(sess.flow) flowNext(e.id, dir, q);
     if(sess.silent){
       sess.answers.push({id:e.id,dir,given:inp.value.trim(),q});
       sess.i++; renderQ(); return;
@@ -1398,6 +1483,8 @@ function renderQ(){
         const r=srsGet(rk(e.id, dict?"enfr":dir));
         r.seen--; if(res.q>=3)r.ok--; logAns(e.id,-1);                 // undo the automatic mark
         srsGrade(e.id, dict?"enfr":dir, 4);
+        if(dir==="enfr") markWritten(e.id);
+        if(sess.flow && res.q<3) flowUpgrade(e.id, dir);
         if(res.q<3){ sess.ok++; const i=sess.wrong.lastIndexOf(e.id); if(i>=0)sess.wrong.splice(i,1); }
         S.claims = S.claims || [];
         S.claims.push({id:e.id, d:(dict?"enfr":dir), a:String(inp.value||"").slice(0,60),
@@ -1622,7 +1709,8 @@ function buildExportCode(){
     const ids=UNITS[uid].lessons[lid].ids;
     const s=ids.filter(isSeen); if(!s.length)return;
     let a=0,c=0; ids.forEach(id=>["f","r"].forEach(d=>{const r=recOf(id,d);if(r){a+=r.seen;c+=r.ok}}));
-    l.push([lid,s.length,ids.length,pct(c,a),a,ids.filter(isMastered).length,TS?(TS[lid]||0):null]);   /* …, answered all time, mastered, answered since the task */
+    l.push([lid,s.length,ids.length,pct(c,a),a,ids.filter(isMastered).length,TS?(TS[lid]||0):null,
+            _a2?ids.filter(id=>(S.wr||{})[id]>=_a2.since).length:null]);   /* …, words written correctly since the task */   /* …, answered all time, mastered, answered since the task */
   }));
   const x=S.exams.slice(-5).map(e2=>[Math.round(e2.t/DAY),e2.pct,e2.n]);
   const a2=assignment();
@@ -1633,6 +1721,8 @@ function buildExportCode(){
     o:{seen:CORPUS.map(e=>e.id).filter(isSeen).length,total:CORPUS.length,
        mast:CORPUS.map(e=>e.id).filter(isMastered).length,sess:S.sessions.length,lee:leeches().length,
        ans:Object.keys(S.srs).reduce((n,k)=>n+(S.srs[k].seen||0),0),
+       ansW:Object.keys(S.srs).reduce((n,k)=>n+(/\|f$/.test(k)?(S.srs[k].seen||0):0),0),
+       ansR:Object.keys(S.srs).reduce((n,k)=>n+(/\|r$/.test(k)?(S.srs[k].seen||0):0),0),
        ansT:TS?Object.keys(TS).reduce((n,k)=>n+TS[k],0):null, ts:_a2?Math.floor(_a2.since/DAY):null},
     u,l,x, a:a2?{lab:a2.label,done:a2.done}:null};
   let code=CFG.prefix+btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
