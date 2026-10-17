@@ -69,7 +69,7 @@ const T={
   padLabel:"Tildes y signos",
   audioLabel:"Audio", audioTitle:"Say the Spanish word automatically",
   audioTest:"audio activado",
-  voiceLabel:"Voz", voiceHint:"★ = the best voice this device offers. Try the others if it does not convince you.",
+  voiceLabel:"Voz", voiceHint:"★ = the best voice this device offers. Try the others if you don't like it.",
   homeTitle:"Tus listas de vocabulario",
   homeLede:"Choose a unit, then a lesson: read the list, or practise it by typing your answers.",
   nameLabel:"Tu nombre",
